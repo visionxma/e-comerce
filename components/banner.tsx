@@ -87,7 +87,7 @@ export function Banner() {
           style={{ 
             background: currentBanner.backgroundColor 
               ? `linear-gradient(135deg, ${currentBanner.backgroundColor}33, ${currentBanner.backgroundColor})`
-              : "linear-gradient(135deg, #0f172a, #7c3aed, #0f172a)"
+              : "linear-gradient(135deg, #0000FF, #000000, #0000FF)"
           }}
         >
           {/* Imagem de fundo com overlay */}
@@ -105,8 +105,8 @@ export function Banner() {
 
           {/* Elementos decorativos animados */}
           <div className="absolute inset-0 overflow-hidden">
-            <div className="absolute -top-40 -right-40 w-80 h-80 bg-white/5 rounded-full blur-3xl animate-pulse"></div>
-            <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-purple-500/10 rounded-full blur-3xl animate-pulse delay-1000"></div>
+            <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-500/10 rounded-full blur-3xl animate-pulse"></div>
+            <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-black/10 rounded-full blur-3xl animate-pulse delay-1000"></div>
           </div>
 
           {/* Texto compacto no canto inferior esquerdo */}
@@ -182,7 +182,7 @@ export function Banner() {
         {banners.length > 1 && (
           <div className="absolute bottom-0 left-0 right-0 h-1 bg-white/20">
             <div 
-              className="h-full bg-gradient-to-r from-purple-500 to-blue-500 transition-all duration-100"
+              className="h-full bg-gradient-to-r from-blue-600 to-black transition-all duration-100"
               style={{ 
                 width: `${((currentBannerIndex + 1) / banners.length) * 100}%`
               }}

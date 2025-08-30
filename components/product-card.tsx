@@ -1,6 +1,6 @@
 "use client"
 
-import { Check, Plus } from "lucide-react"
+import { Eye, ShoppingCart } from "lucide-react"
 import type { Product } from "@/e-comerce/app/page"
 
 interface ProductCardProps {
@@ -14,27 +14,12 @@ export function ProductCard({ product, isSelected, onSelect, compact = false }: 
   return (
     <div
       onClick={onSelect}
-      className={`group relative bg-white rounded-xl overflow-hidden cursor-pointer transition-all duration-300 ${
-        isSelected 
-          ? "ring-2 ring-purple-500 shadow-lg shadow-purple-500/10" 
-          : "border border-gray-200 hover:shadow-lg hover:shadow-gray-300/20"
-      } ${compact ? 'h-full' : ''}`}
+      className="group relative bg-white rounded-xl overflow-hidden cursor-pointer transition-all duration-300 border border-gray-200 hover:shadow-lg hover:shadow-blue-300/20 hover:border-blue-300 h-full"
     >
-      {/* Badge de seleção */}
-      <div className={`absolute top-2 right-2 z-10 transition-all duration-300 ${
-        isSelected ? "scale-100 opacity-100" : "scale-0 opacity-0"
-      }`}>
-        <div className="bg-gradient-to-r from-purple-500 to-indigo-600 text-white rounded-full p-1.5 shadow-md">
-          <Check className="h-3 w-3" />
-        </div>
-      </div>
-
-      {/* Plus icon para não selecionados */}
-      <div className={`absolute top-2 right-2 z-10 transition-all duration-300 ${
-        !isSelected ? "opacity-0 group-hover:opacity-100 scale-75 group-hover:scale-100" : "scale-0 opacity-0"
-      }`}>
-        <div className="bg-white/90 backdrop-blur-sm border border-gray-200 text-gray-600 rounded-full p-1.5 shadow-md">
-          <Plus className="h-3 w-3" />
+      {/* Ícone de visualização */}
+      <div className="absolute top-2 right-2 z-10 transition-all duration-300 opacity-0 group-hover:opacity-100 scale-75 group-hover:scale-100">
+        <div className="bg-white/90 backdrop-blur-sm border border-blue-200 text-blue-600 rounded-full p-1.5 shadow-md">
+          <Eye className="h-3 w-3" />
         </div>
       </div>
 
@@ -51,7 +36,7 @@ export function ProductCard({ product, isSelected, onSelect, compact = false }: 
         
         {/* Badge de preço flutuante */}
         <div className="absolute bottom-2 left-2 backdrop-blur-md bg-white/90 rounded-full px-2 py-1 shadow-sm border border-white/50">
-          <span className="text-xs font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent">
+          <span className="text-xs font-bold text-blue-600">
             R$ {product.price.toFixed(2)}
           </span>
         </div>
@@ -96,31 +81,23 @@ export function ProductCard({ product, isSelected, onSelect, compact = false }: 
           {/* Indicador de estoque */}
           {product.stock !== undefined && (
             <div className={`text-[10px] font-medium ${
-              product.stock > 0 ? 'text-green-600' : 'text-red-600'
+              product.stock > 0 ? 'text-blue-600' : 'text-black'
             }`}>
               {product.stock > 0 ? `${product.stock} em estoque` : 'Sem estoque'}
             </div>
           )}
           
-          {/* Indicador de seleção */}
-          <div className={`transition-all duration-300 ${
-            isSelected 
-              ? "text-purple-600 font-semibold" 
-              : "text-gray-400 group-hover:text-purple-500"
-          }`}>
+          {/* Indicador de ação */}
+          <div className="transition-all duration-300 text-gray-400 group-hover:text-blue-600">
             <span className="text-[10px]">
-              {isSelected ? "✓ Selecionado" : "Selecionar"}
+              Ver detalhes
             </span>
           </div>
         </div>
       </div>
 
-      {/* Efeito de borda animada */}
-      <div className={`absolute inset-0 rounded-xl transition-all duration-300 pointer-events-none ${
-        isSelected 
-          ? "bg-gradient-to-r from-purple-500/5 via-transparent to-indigo-500/5" 
-          : ""
-      }`}></div>
+      {/* Overlay de hover */}
+      <div className="absolute inset-0 rounded-xl transition-all duration-300 pointer-events-none group-hover:bg-gradient-to-r group-hover:from-blue-500/5 group-hover:via-transparent group-hover:to-black/5"></div>
 
       {/* Shimmer effect sutil */}
       <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none">

@@ -67,12 +67,12 @@ export function BannerWrapper() {
             </div>
 
             {/* Texto de carregamento sutil */}
-            <div className="relative z-10 text-center">
+          <div className="absolute inset-0 bg-gradient-to-br from-blue-800/50 to-black/30 animate-pulse"></div>
               <div className="backdrop-blur-sm bg-white/5 rounded-xl p-4 border border-white/10">
                 <div className="w-8 h-8 border-2 border-white/30 border-t-white/80 rounded-full animate-spin mx-auto"></div>
                 <p className="text-white/60 text-sm mt-2 font-medium">Carregando...</p>
-              </div>
-            </div>
+            <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-500/10 rounded-full blur-3xl animate-pulse"></div>
+            <div className="h-full w-1/3 bg-gradient-to-r from-blue-600/50 to-black/50 animate-pulse"></div>
           </div>
         </div>
       </div>

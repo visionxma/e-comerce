@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { ProductCard } from "@/components/product-card"
-import { CheckoutModal } from "@/components/checkout-modal"
+import { ProductModal } from "@/components/product-modal"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { Banner } from "@/components/banner"
@@ -24,8 +24,8 @@ export interface Product {
 }
 
 export default function HomePage() {
-  const [selectedProducts, setSelectedProducts] = useState<Product[]>([])
-  const [isCheckoutOpen, setIsCheckoutOpen] = useState(false)
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
+  const [isProductModalOpen, setIsProductModalOpen] = useState(false)
   const [userData, setUserData] = useState<{ name: string; phone: string; address: string } | null>(null)
   const [products, setProducts] = useState<Product[]>([])
   const [isLoadingProducts, setIsLoadingProducts] = useState(true)
@@ -52,20 +52,8 @@ export default function HomePage() {
   }, [])
 
   const handleProductSelect = (product: Product) => {
-    setSelectedProducts((prev) => {
-      const exists = prev.find((p) => p.id === product.id)
-      if (exists) {
-        return prev.filter((p) => p.id !== product.id)
-      } else {
-        return [...prev, product]
-      }
-    })
-  }
-
-  const handleCheckout = () => {
-    if (selectedProducts.length > 0) {
-      setIsCheckoutOpen(true)
-    }
+    setSelectedProduct(product)
+    setIsProductModalOpen(true)
   }
 
   const handleUserRegistration = (data: { name: string; phone: string; address: string }) => {
@@ -77,8 +65,6 @@ export default function HomePage() {
     localStorage.removeItem("userData")
     setUserData(null)
   }
-
-  const totalPrice = selectedProducts.reduce((sum, product) => sum + product.price, 0)
 
   // Filtrar produtos baseado no termo de pesquisa
   const filteredProducts = products.filter((product) => {
@@ -219,7 +205,7 @@ export default function HomePage() {
                   <ProductCard
                     key={product.id}
                     product={product}
-                    isSelected={selectedProducts.some((p) => p.id === product.id)}
+                    isSelected={false}
                     onSelect={() => handleProductSelect(product)}
                     compact={true}
                   />
@@ -242,7 +228,7 @@ export default function HomePage() {
                       <ProductCard
                         key={product.id}
                         product={product}
-                        isSelected={selectedProducts.some((p) => p.id === product.id)}
+                        isSelected={false}
                         onSelect={() => handleProductSelect(product)}
                         compact={true}
                       />
@@ -254,20 +240,6 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* Floating Cart Button */}
-        {selectedProducts.length > 0 && (
-          <div className="fixed bottom-4 left-2 right-2 z-50">
-            <button
-              onClick={handleCheckout}
-              className="w-full bg-primary text-primary-foreground py-3 px-4 rounded-lg shadow-lg font-semibold text-sm flex items-center justify-between"
-            >
-              <span>
-                Pedido ({selectedProducts.length})
-              </span>
-              <span>R$ {totalPrice.toFixed(2)}</span>
-            </button>
-          </div>
-        )}
       </main>
 
       <Footer />
@@ -291,11 +263,10 @@ export default function HomePage() {
         </div>
       </div>
 
-      <CheckoutModal
-        isOpen={isCheckoutOpen}
-        onClose={() => setIsCheckoutOpen(false)}
-        selectedProducts={selectedProducts}
-        totalPrice={totalPrice}
+      <ProductModal
+        isOpen={isProductModalOpen}
+        onClose={() => setIsProductModalOpen(false)}
+        product={selectedProduct}
         userData={userData}
       />
     </div>
