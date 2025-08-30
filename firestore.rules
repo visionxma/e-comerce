@@ -1,0 +1,82 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Regras para a coleção de produtos
+    match /products/{productId} {
+      // Permitir leitura para todos (produtos são públicos na loja)
+      allow read: if true;
+      
+      // Permitir escrita apenas para usuários autenticados (administradores)
+      allow write: if request.auth != null;
+      
+      // Validação dos dados do produto
+      allow create: if request.auth != null 
+        && validateProductData(request.resource.data);
+      
+      allow update: if request.auth != null 
+        && validateProductData(request.resource.data);
+      
+      allow delete: if request.auth != null;
+    }
+    
+    // Regras para a coleção de banners
+    match /banners/{bannerId} {
+      // Permitir leitura para todos (banners são públicos)
+      allow read: if true;
+      
+      // Permitir escrita apenas para usuários autenticados (administradores)
+      allow write: if request.auth != null;
+      
+      // Validação dos dados do banner
+      allow create: if request.auth != null 
+        && validateBannerData(request.resource.data);
+      
+      allow update: if request.auth != null 
+        && validateBannerData(request.resource.data);
+      
+      allow delete: if request.auth != null;
+    }
+    
+    // Função para validar dados do produto
+    function validateProductData(data) {
+      return data.keys().hasAll(['name', 'price', 'category', 'images']) &&
+             data.name is string &&
+             data.name.size() > 0 &&
+             data.price is number &&
+             data.price >= 0 &&
+             data.category is string &&
+             data.category.size() > 0 &&
+             data.images is list &&
+             data.images.size() > 0 &&
+             data.images.size() <= 3 &&
+             (!data.keys().hasAny(['description']) || data.description is string) &&
+             (!data.keys().hasAny(['size']) || data.size is string) &&
+             (!data.keys().hasAny(['brand']) || data.brand is string) &&
+             (!data.keys().hasAny(['stock']) || (data.stock is number && data.stock >= 0)) &&
+             (!data.keys().hasAny(['featured']) || data.featured is bool) &&
+             (!data.keys().hasAny(['sold']) || data.sold is bool);
+    }
+    
+    // Função para validar dados do banner
+    function validateBannerData(data) {
+      return data.keys().hasAll(['title', 'imageUrl', 'isActive', 'priority']) &&
+             data.title is string &&
+             data.title.size() > 0 &&
+             data.imageUrl is string &&
+             data.imageUrl.size() > 0 &&
+             data.isActive is bool &&
+             data.priority is number &&
+             data.priority >= 1 &&
+             data.priority <= 10 &&
+             (!data.keys().hasAny(['description']) || data.description is string) &&
+             (!data.keys().hasAny(['linkUrl']) || data.linkUrl is string) &&
+             (!data.keys().hasAny(['startDate']) || data.startDate is string) &&
+             (!data.keys().hasAny(['endDate']) || data.endDate is string) &&
+             (!data.keys().hasAny(['backgroundColor']) || data.backgroundColor is string) &&
+             (!data.keys().hasAny(['textColor']) || data.textColor is string) &&
+             (!data.keys().hasAny(['createdAt']) || data.createdAt is timestamp);
+    }
+  }
+}
