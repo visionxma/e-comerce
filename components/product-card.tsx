@@ -1,6 +1,7 @@
 "use client"
 
-import { Eye, ShoppingCart } from "lucide-react"
+import { Eye, ShoppingCart, ChevronLeft, ChevronRight } from "lucide-react"
+import { useState } from "react"
 import type { Product } from "@/e-comerce/app/page"
 
 interface ProductCardProps {
@@ -11,6 +12,19 @@ interface ProductCardProps {
 }
 
 export function ProductCard({ product, isSelected, onSelect, compact = false }: ProductCardProps) {
+  const [currentImageIndex, setCurrentImageIndex] = useState(0)
+  const images = product.images && product.images.length > 0 ? product.images : ["/placeholder.svg"]
+
+  const nextImage = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    setCurrentImageIndex((prev) => (prev + 1) % images.length)
+  }
+
+  const prevImage = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    setCurrentImageIndex((prev) => (prev - 1 + images.length) % images.length)
+  }
+
   return (
     <div
       onClick={onSelect}
@@ -26,16 +40,46 @@ export function ProductCard({ product, isSelected, onSelect, compact = false }: 
       {/* Container da imagem */}
       <div className="relative aspect-square overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200">
         <img 
-          src={product.image || "/placeholder.svg"} 
+          src={images[currentImageIndex]} 
           alt={product.name} 
           className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" 
         />
+        
+        {/* Navegação do carrossel - só aparece se houver mais de uma imagem */}
+        {images.length > 1 && (
+          <>
+            <button
+              onClick={prevImage}
+              className="absolute left-2 top-1/2 transform -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-10"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            <button
+              onClick={nextImage}
+              className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-10"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+            
+            {/* Indicadores de imagem */}
+            <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 flex space-x-1">
+              {images.map((_, index) => (
+                <div
+                  key={index}
+                  className={`w-1.5 h-1.5 rounded-full transition-colors duration-300 ${
+                    index === currentImageIndex ? 'bg-white' : 'bg-white/50'
+                  }`}
+                />
+              ))}
+            </div>
+          </>
+        )}
         
         {/* Overlay gradiente sutil */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/10 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
         
         {/* Badge de preço flutuante */}
-        <div className="absolute bottom-2 left-2 backdrop-blur-md bg-white/90 rounded-full px-2 py-1 shadow-sm border border-white/50">
+        <div className="absolute top-2 left-2 backdrop-blur-md bg-white/90 rounded-full px-2 py-1 shadow-sm border border-white/50">
           <span className="text-xs font-bold text-blue-600">
             R$ {product.price.toFixed(2)}
           </span>
@@ -43,14 +87,14 @@ export function ProductCard({ product, isSelected, onSelect, compact = false }: 
 
         {/* Badge de tamanho se existir */}
         {product.size && (
-          <div className="absolute top-2 left-2 backdrop-blur-md bg-black/70 text-white rounded-md px-1.5 py-0.5">
+          <div className="absolute top-2 right-2 backdrop-blur-md bg-black/70 text-white rounded-md px-1.5 py-0.5">
             <span className="text-[10px] font-medium">{product.size}</span>
           </div>
         )}
 
         {/* Badge de marca se existir */}
         {product.brand && (
-          <div className="absolute top-2 right-2 backdrop-blur-md bg-black/70 text-white rounded-md px-1.5 py-0.5">
+          <div className="absolute top-8 right-2 backdrop-blur-md bg-black/70 text-white rounded-md px-1.5 py-0.5">
             <span className="text-[10px] font-medium">{product.brand}</span>
           </div>
         )}

@@ -57,7 +57,7 @@ export default function AdminPage() {
     name: "",
     description: "",
     price: 0,
-    image: "",
+    images: [],
     category: "",
     size: "",
     brand: "",
@@ -152,8 +152,8 @@ export default function AdminPage() {
   }
 
   const handleAddProduct = async () => {
-    if (!newProduct.name || newProduct.price <= 0 || !newProduct.category) {
-      alert("Preencha os campos obrigatórios: Nome, Preço e Categoria.")
+    if (!newProduct.name || newProduct.price <= 0 || !newProduct.category || newProduct.images.length === 0) {
+      alert("Preencha os campos obrigatórios: Nome, Preço, Categoria e pelo menos uma imagem.")
       return
     }
     
@@ -163,7 +163,7 @@ export default function AdminPage() {
         name: "",
         description: "",
         price: 0,
-        image: "",
+        images: [],
         category: "",
         size: "",
         brand: "",
@@ -214,7 +214,7 @@ export default function AdminPage() {
         name: product.name,
         description: product.description,
         price: product.price,
-        image: product.image,
+        images: product.images,
         category: product.category,
         size: product.size,
         brand: product.brand,
@@ -284,7 +284,7 @@ export default function AdminPage() {
     }
   }
 
-  const uploadImage = async (file: File, type: 'product' | 'banner') => {
+  const uploadImage = async (file: File, type: 'product' | 'banner', productImageIndex?: number) => {
     try {
       const formData = new FormData()
       formData.append("file", file)
@@ -300,7 +300,13 @@ export default function AdminPage() {
       const data = await response.json()
       
       if (type === 'product') {
-        setNewProduct({ ...newProduct, image: data.secure_url })
+        if (productImageIndex !== undefined) {
+          const newImages = [...newProduct.images]
+          newImages[productImageIndex] = data.secure_url
+          setNewProduct({ ...newProduct, images: newImages })
+        } else {
+          setNewProduct({ ...newProduct, images: [...newProduct.images, data.secure_url] })
+        }
       } else {
         setNewBanner({ ...newBanner, imageUrl: data.secure_url })
       }
@@ -311,6 +317,17 @@ export default function AdminPage() {
       alert("Erro ao fazer upload da imagem. Tente novamente.")
       return null
     }
+  }
+
+  const addProductImage = () => {
+    if (newProduct.images.length < 3) {
+      setNewProduct({ ...newProduct, images: [...newProduct.images, ""] })
+    }
+  }
+
+  const removeProductImage = (index: number) => {
+    const newImages = newProduct.images.filter((_, i) => i !== index)
+    setNewProduct({ ...newProduct, images: newImages })
   }
 
   if (isLoading) {
@@ -528,40 +545,69 @@ export default function AdminPage() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="image">Imagem do Produto</Label>
-                    <div className="flex items-center gap-4">
-                      <Input
-                        id="image"
-                        type="file"
-                        accept="image/*"
-                        onChange={async (e) => {
-                          const file = e.target.files?.[0]
-                          if (file) await uploadImage(file, 'product')
-                        }}
-                        className="flex-1"
-                      />
-                      <Button 
-                        type="button" 
-                        variant="outline" 
-                        className="flex items-center gap-2"
-                        onClick={() => {
-                          const input = document.getElementById('image') as HTMLInputElement
-                          input?.click()
-                        }}
-                      >
-                        <Upload className="w-4 h-4" />
-                        Upload
-                      </Button>
-                    </div>
-                    {newProduct.image && (
-                      <div className="mt-2">
-                        <img
-                          src={newProduct.image}
-                          alt="Preview"
-                          className="w-32 h-32 object-contain border rounded-md"
-                        />
+                    <Label>Imagens do Produto (até 3 imagens) *</Label>
+                    <div className="space-y-4">
+                      {newProduct.images.map((image, index) => (
+                        <div key={index} className="border rounded-lg p-4">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-sm font-medium">Imagem {index + 1}</span>
+                            <Button
+                              type="button"
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => removeProductImage(index)}
+                            >
+                              <X className="w-4 h-4" />
+                            </Button>
+                          </div>
+                          <div className="flex items-center gap-4">
+                            <Input
+                              type="file"
+                              accept="image/*"
+                              onChange={async (e) => {
+                                const file = e.target.files?.[0]
+                                if (file) await uploadImage(file, 'product', index)
+                              }}
+                              className="flex-1"
+                            />
+                            <Button 
+                              type="button" 
+                              variant="outline" 
+                              className="flex items-center gap-2"
+                              onClick={() => {
+                                const inputs = document.querySelectorAll('input[type="file"]')
+                                const input = inputs[index + 1] as HTMLInputElement // +1 porque o primeiro é do banner
+                                input?.click()
+                              }}
+                            >
+                              <Upload className="w-4 h-4" />
+                              Upload
+                            </Button>
+                          </div>
+                          {image && (
+                            <div className="mt-2">
+                              <img
+                                src={image}
+                                alt={`Preview ${index + 1}`}
+                                className="w-32 h-32 object-contain border rounded-md"
+                              />
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                      
+                      {newProduct.images.length < 3 && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={addProductImage}
+                          className="w-full flex items-center gap-2"
+                        >
+                          <Plus className="w-4 h-4" />
+                          Adicionar Imagem ({newProduct.images.length}/3)
+                        </Button>
+                      )}
                       </div>
-                    )}
                   </div>
                   <div className="flex items-center space-x-2">
                     <Switch
@@ -609,11 +655,17 @@ export default function AdminPage() {
                 {filteredProducts.map((product) => (
                   <Card key={product.id} className={`overflow-hidden ${product.featured ? 'border-primary border-2' : ''}`}>
                     <div className="relative">
-                      <img
-                        src={product.image || "/placeholder.svg"}
-                        alt={product.name}
-                        className="w-full h-48 object-cover"
-                      />
+                      {product.images && product.images.length > 0 ? (
+                        <img
+                          src={product.images[0]}
+                          alt={product.name}
+                          className="w-full h-48 object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-48 bg-gray-200 flex items-center justify-center">
+                          <ImageIcon className="w-12 h-12 text-gray-400" />
+                        </div>
+                      )}
                       {product.featured && (
                         <Badge className="absolute top-2 left-2 bg-primary">Destaque</Badge>
                       )}
@@ -940,11 +992,17 @@ export default function AdminPage() {
                         </div>
                       ) : (
                         <div className="flex flex-col md:flex-row items-start gap-4">
-                          <img
-                            src={banner.imageUrl || "/placeholder.svg"}
-                            alt={banner.title}
-                            className="w-full md:w-48 h-32 object-cover rounded"
-                          />
+                          {product.images && product.images.length > 0 ? (
+                            <img
+                              src={product.images[0]}
+                              alt={product.name}
+                              className="w-full md:w-48 h-32 object-cover rounded"
+                            />
+                          ) : (
+                            <div className="w-full md:w-48 h-32 bg-gray-200 flex items-center justify-center rounded">
+                              <ImageIcon className="w-8 h-8 text-gray-400" />
+                            </div>
+                          )}
                           <div className="flex-1">
                             <div className="flex flex-wrap items-center gap-2 mb-2">
                               <h3 className="font-semibold text-lg">{banner.title}</h3>

@@ -1,6 +1,7 @@
 "use client"
 
-import { X, ShoppingCart, Star, Package, Truck, Shield } from "lucide-react"
+import { X, ShoppingCart, Star, Package, Truck, Shield, ChevronLeft, ChevronRight } from "lucide-react"
+import { useState } from "react"
 import type { Product } from "@/app/page"
 
 interface ProductModalProps {
@@ -11,7 +12,19 @@ interface ProductModalProps {
 }
 
 export function ProductModal({ isOpen, onClose, product, userData }: ProductModalProps) {
+  const [currentImageIndex, setCurrentImageIndex] = useState(0)
+  
   if (!isOpen || !product) return null
+
+  const images = product.images && product.images.length > 0 ? product.images : ["/placeholder.svg"]
+
+  const nextImage = () => {
+    setCurrentImageIndex((prev) => (prev + 1) % images.length)
+  }
+
+  const prevImage = () => {
+    setCurrentImageIndex((prev) => (prev - 1 + images.length) % images.length)
+  }
 
   const handleBuyNow = () => {
     let customerInfo = ""
@@ -57,10 +70,41 @@ Gostaria de mais informações sobre este produto! 🙏`
           {/* Imagem do produto */}
           <div className="relative h-80 bg-gradient-to-br from-gray-100 to-gray-200 rounded-t-2xl overflow-hidden">
             <img 
-              src={product.image || "/placeholder.svg"} 
+              src={images[currentImageIndex]} 
               alt={product.name} 
               className="w-full h-full object-cover"
             />
+            
+            {/* Navegação do carrossel no modal */}
+            {images.length > 1 && (
+              <>
+                <button
+                  onClick={prevImage}
+                  className="absolute left-4 top-1/2 transform -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white rounded-full p-2 transition-colors duration-300"
+                >
+                  <ChevronLeft className="h-5 w-5" />
+                </button>
+                <button
+                  onClick={nextImage}
+                  className="absolute right-4 top-1/2 transform -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white rounded-full p-2 transition-colors duration-300"
+                >
+                  <ChevronRight className="h-5 w-5" />
+                </button>
+                
+                {/* Indicadores de imagem no modal */}
+                <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex space-x-2">
+                  {images.map((_, index) => (
+                    <button
+                      key={index}
+                      onClick={() => setCurrentImageIndex(index)}
+                      className={`w-3 h-3 rounded-full transition-colors duration-300 ${
+                        index === currentImageIndex ? 'bg-white' : 'bg-white/50'
+                      }`}
+                    />
+                  ))}
+                </div>
+              </>
+            )}
             
             {/* Badge de categoria */}
             <div className="absolute top-4 left-4 bg-blue-600 text-white px-3 py-1 rounded-full text-sm font-medium">
