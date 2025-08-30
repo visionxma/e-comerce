@@ -1,7 +1,8 @@
 "use client"
 
-import { Eye, ShoppingCart, ChevronLeft, ChevronRight } from "lucide-react"
+import { Eye, ShoppingCart, ChevronLeft, ChevronRight, Plus } from "lucide-react"
 import { useState } from "react"
+import { CartButton } from "./cart-button"
 import type { Product } from "@/e-comerce/app/page"
 
 interface ProductCardProps {
@@ -135,10 +136,11 @@ export function ProductCard({ product, isSelected, onSelect, compact = false }: 
           
           {/* Indicador de ação */}
           <div className="flex items-center transition-all duration-300 text-gray-400 group-hover:text-blue-600">
-            <span className="text-[10px] mr-1">
-              Ver detalhes
-            </span>
-            <ShoppingCart className="h-3 w-3" />
+            <CartButton 
+              product={product} 
+              variant="icon" 
+              className="h-6 w-6 text-xs bg-blue-600 hover:bg-blue-700 text-white border-0"
+            />
           </div>
         </div>
       </div>

@@ -2,6 +2,8 @@
 
 import { X, ShoppingCart, Star, Package, Truck, Shield, ChevronLeft, ChevronRight } from "lucide-react"
 import { useState } from "react"
+import { CartButton } from "./cart-button"
+import { Button } from "@/components/ui/button"
 import type { Product } from "@/app/page"
 
 interface ProductModalProps {
@@ -195,16 +197,22 @@ Gostaria de mais informações sobre este produto! 🙏`
 
           {/* Botão de compra */}
           <div className="space-y-3">
+            {/* Botão adicionar ao carrinho */}
+            <CartButton 
+              product={product}
+              className="w-full bg-gradient-to-r from-green-600 to-green-700 text-white py-4 px-6 rounded-xl font-bold text-lg flex items-center justify-center gap-3 hover:from-green-700 hover:to-green-800 transition-all duration-300 shadow-lg hover:shadow-xl hover:scale-[1.02]"
+            />
+            
+            {/* Botão comprar direto */}
             <button
               onClick={handleBuyNow}
-              className="w-full bg-gradient-to-r from-blue-600 to-black text-white py-4 px-6 rounded-xl font-bold text-lg flex items-center justify-center gap-3 hover:from-blue-700 hover:to-gray-900 transition-all duration-300 shadow-lg hover:shadow-xl hover:scale-[1.02]"
+              className="w-full bg-gradient-to-r from-blue-600 to-black text-white py-3 px-6 rounded-xl font-semibold text-base flex items-center justify-center gap-3 hover:from-blue-700 hover:to-gray-900 transition-all duration-300 shadow-lg hover:shadow-xl hover:scale-[1.02]"
             >
-              <ShoppingCart className="h-6 w-6" />
-              Comprar no WhatsApp
+              Comprar Direto no WhatsApp
             </button>
             
             <p className="text-center text-sm text-gray-600">
-              🔒 Compra segura via WhatsApp • Entrega garantida
+              🔒 Adicione ao carrinho ou compre direto • Entrega garantida
             </p>
           </div>
         </div>

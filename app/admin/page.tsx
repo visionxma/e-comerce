@@ -18,7 +18,7 @@ import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { 
   Trash2, Edit, Plus, Save, X, LogOut, Image as ImageIcon, Eye, EyeOff, 
-  Upload, Search, Filter, AlertCircle, ShoppingBag, Image
+  Upload, Search, Filter, AlertCircle, ShoppingBag, Image, CheckCircle, Package
 } from "lucide-react"
 import { signInWithEmailAndPassword, signOut, onAuthStateChanged } from "firebase/auth"
 import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy } from "firebase/firestore"
@@ -56,6 +56,10 @@ export default function AdminPage() {
   const [loginError, setLoginError] = useState("")
   const [uploadingImages, setUploadingImages] = useState<boolean[]>([])
   
+  // Separar produtos vendidos e não vendidos
+  const availableProducts = products.filter(product => !product.sold)
+  const soldProducts = products.filter(product => product.sold)
+  
     const [newProduct, setNewProduct] = useState<Omit<Product, "id">>({
     name: "",
     description: "",
@@ -65,7 +69,8 @@ export default function AdminPage() {
     size: "",
     brand: "",
     stock: 0,
-    featured: false
+    featured: false,
+    sold: false
   })
 
   const [newBanner, setNewBanner] = useState<Omit<Banner, "id" | "createdAt">>({
@@ -84,10 +89,10 @@ export default function AdminPage() {
   const fileInputRefs = useRef<(HTMLInputElement | null)[]>([])
 
   // Obter categorias únicas dos produtos
-  const categories = ["all", ...new Set(products.map(product => product.category).filter(Boolean))]
+  const categories = ["all", ...new Set(availableProducts.map(product => product.category).filter(Boolean))]
 
   // Filtrar produtos
-  const filteredProducts = products.filter(product => {
+  const filteredProducts = availableProducts.filter(product => {
     const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
                           product.description.toLowerCase().includes(searchTerm.toLowerCase())
     const matchesCategory = selectedCategory === "all" || product.category === selectedCategory
@@ -173,7 +178,8 @@ export default function AdminPage() {
         size: "",
         brand: "",
         stock: 0,
-        featured: false
+        featured: false,
+        sold: false
       })
       setIsAddingNew(false)
     } catch (error) {
@@ -224,7 +230,8 @@ export default function AdminPage() {
         size: product.size,
         brand: product.brand,
         stock: product.stock,
-        featured: product.featured
+        featured: product.featured,
+        sold: product.sold
       })
       setEditingProduct(null)
     } catch (error) {
@@ -266,6 +273,18 @@ export default function AdminPage() {
     }
   }
 
+  const markAsSold = async (productId: string, sold: boolean) => {
+    try {
+      const productRef = doc(db, "products", productId)
+      await updateDoc(productRef, { sold })
+      
+      const action = sold ? "marcado como vendido" : "marcado como disponível"
+      console.log(`Produto ${action}`)
+    } catch (error) {
+      console.error("Erro ao atualizar status de venda:", error)
+      alert("Erro ao atualizar status de venda.")
+    }
+  }
 
   const handleDeleteBanner = async (id: string) => {
     if (confirm("Tem certeza que deseja excluir este banner? Esta ação não pode ser desfeita.")) {
@@ -462,7 +481,7 @@ export default function AdminPage() {
           <TabsList className="grid w-full grid-cols-2 mb-6">
             <TabsTrigger value="products" className="flex items-center gap-2">
               <ShoppingBag className="w-4 h-4" />
-              Produtos ({products.length})
+              Produtos ({availableProducts.length} disponíveis, {soldProducts.length} vendidos)
             </TabsTrigger>
             <TabsTrigger value="banners" className="flex items-center gap-2">
               <Image className="w-4 h-4" />
@@ -792,6 +811,21 @@ export default function AdminPage() {
                             {product.size && <Badge variant="outline" className="text-xs">{product.size}</Badge>}
                           </div>
                           <p className="text-sm text-muted-foreground mb-3 line-clamp-2">{product.description}</p>
+                          <div className="flex gap-2 mb-3">
+                            <Button
+                              size="sm"
+                              variant={product.sold ? "outline" : "default"}
+                              onClick={() => markAsSold(product.id, !product.sold)}
+                              className={`flex items-center gap-1 flex-1 ${
+                                product.sold 
+                                  ? 'bg-green-100 text-green-800 hover:bg-green-200' 
+                                  : 'bg-orange-100 text-orange-800 hover:bg-orange-200'
+                              }`}
+                            >
+                              <CheckCircle className="w-3 h-3" />
+                              {product.sold ? 'Marcar Disponível' : 'Marcar como Vendido'}
+                            </Button>
+                          </div>
                           <div className="flex gap-2">
                             <Button
                               size="sm"
@@ -816,6 +850,61 @@ export default function AdminPage() {
                     </CardContent>
                   </Card>
                 ))}
+              </div>
+            )}
+
+            {/* Seção de produtos vendidos */}
+            {soldProducts.length > 0 && (
+              <div className="mt-8">
+                <div className="flex items-center gap-2 mb-4">
+                  <Package className="w-5 h-5 text-muted-foreground" />
+                  <h3 className="text-xl font-semibold text-muted-foreground">
+                    Produtos Vendidos ({soldProducts.length})
+                  </h3>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {soldProducts.map((product) => (
+                    <Card key={product.id} className="opacity-60 border-dashed">
+                      <div className="relative">
+                        {product.images && product.images.length > 0 ? (
+                          <img
+                            src={product.images[0]}
+                            alt={product.name}
+                            className="w-full h-48 object-cover grayscale"
+                          />
+                        ) : (
+                          <div className="w-full h-48 bg-gray-200 flex items-center justify-center">
+                            <ImageIcon className="w-12 h-12 text-gray-400" />
+                          </div>
+                        )}
+                        <Badge className="absolute top-2 left-2 bg-green-600">VENDIDO</Badge>
+                      </div>
+                      <CardContent className="p-4">
+                        <h3 className="font-semibold text-lg mb-1 line-clamp-1">{product.name}</h3>
+                        <p className="text-lg font-bold text-primary mb-2">R$ {product.price.toFixed(2)}</p>
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => markAsSold(product.id, false)}
+                            className="flex items-center gap-1 flex-1 bg-blue-100 text-blue-800 hover:bg-blue-200"
+                          >
+                            <Package className="w-3 h-3" />
+                            Marcar Disponível
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            onClick={() => handleDeleteProduct(product.id)}
+                            className="flex items-center gap-1"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
               </div>
             )}
           </TabsContent>
@@ -1136,6 +1225,7 @@ export default function AdminPage() {
                 <li>• Controle de estoque e preços</li>
                 <li>• Destaque produtos especiais</li>
                 <li>• Organize por categorias</li>
+                <li>• Marque produtos como vendidos</li>
               </ul>
             </div>
             <div>

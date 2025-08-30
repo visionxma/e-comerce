@@ -1,13 +1,16 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { CartProvider } from "@/components/cart-provider"
+import { CartSidebar } from "@/components/cart-sidebar"
+import { Toaster } from "@/components/ui/toaster"
 import { ProductCard } from "@/components/product-card"
 import { ProductModal } from "@/components/product-modal"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { Banner } from "@/components/banner"
 import { UserRegistration } from "@/components/user-registration"
-import { collection, onSnapshot, query, orderBy } from "firebase/firestore"
+import { collection, onSnapshot, query, orderBy, where } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 
 export interface Product {
@@ -21,6 +24,7 @@ export interface Product {
   brand?: string
   stock?: number
   featured?: boolean
+  sold?: boolean
 }
 
 export default function HomePage() {
@@ -37,11 +41,21 @@ export default function HomePage() {
       setUserData(JSON.parse(savedUserData))
     }
 
-    const q = query(collection(db, "products"), orderBy("name"))
+    // Filtrar apenas produtos não vendidos
+    const q = query(
+      collection(db, "products"), 
+      where("sold", "!=", true),
+      orderBy("sold"),
+      orderBy("name")
+    )
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const productsData: Product[] = []
       snapshot.forEach((doc) => {
-        productsData.push({ id: doc.id, ...doc.data() } as Product)
+        const data = doc.data()
+        // Só adiciona produtos que não estão marcados como vendidos
+        if (!data.sold) {
+          productsData.push({ id: doc.id, ...data } as Product)
+        }
       })
 
       setProducts(productsData)
@@ -91,10 +105,11 @@ export default function HomePage() {
   const categories = Object.keys(groupedProducts).sort()
 
   return (
-    <div className="min-h-screen bg-background">
-      <Header />
+    <CartProvider>
+      <div className="min-h-screen bg-background">
+        <Header />
 
-      <main className="container mx-auto px-2 py-4">
+        <main className="container mx-auto px-2 py-4">
         {/* Hero Section */}
         <div className="text-center mb-4">
           <p className="text-muted-foreground text-sm">Encontre tudo o que você precisa, entrega rápida e segura</p>
@@ -240,35 +255,42 @@ export default function HomePage() {
           </div>
         )}
 
-      </main>
+        </main>
 
-      <Footer />
+        <Footer />
 
-      {/* VisionX Footer */}
-      <div className="bg-black text-white">
-        <div className="container mx-auto px-2 py-2">
-          <div className="text-center">
-            <p className="text-xs">
-              Criado por{" "}
-              <a 
-                href="https://visionxma.com" 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="font-semibold text-white hover:text-gray-300 transition-colors underline"
-              >
-                VisionX
-              </a>
-            </p>
+        {/* VisionX Footer */}
+        <div className="bg-black text-white">
+          <div className="container mx-auto px-2 py-2">
+            <div className="text-center">
+              <p className="text-xs">
+                Criado por{" "}
+                <a 
+                  href="https://visionxma.com" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="font-semibold text-white hover:text-gray-300 transition-colors underline"
+                >
+                  VisionX
+                </a>
+              </p>
+            </div>
           </div>
         </div>
-      </div>
 
-      <ProductModal
-        isOpen={isProductModalOpen}
-        onClose={() => setIsProductModalOpen(false)}
-        product={selectedProduct}
-        userData={userData}
-      />
-    </div>
+        <ProductModal
+          isOpen={isProductModalOpen}
+          onClose={() => setIsProductModalOpen(false)}
+          product={selectedProduct}
+          userData={userData}
+        />
+
+        {/* Carrinho Sidebar */}
+        <CartSidebar userData={userData} />
+        
+        {/* Toast notifications */}
+        <Toaster />
+      </div>
+    </CartProvider>
   )
 }
