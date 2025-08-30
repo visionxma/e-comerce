@@ -28,15 +28,10 @@ export function ProductCard({ product, isSelected, onSelect, compact = false }: 
   return (
     <div
       onClick={onSelect}
-      className="group relative bg-white rounded-xl overflow-hidden cursor-pointer transition-all duration-300 border border-gray-200 hover:shadow-lg hover:shadow-blue-300/20 hover:border-blue-300 h-full"
+      className={`group relative bg-white rounded-xl overflow-hidden cursor-pointer transition-all duration-300 border border-gray-200 hover:shadow-lg hover:shadow-blue-300/20 hover:border-blue-300 h-full ${
+        isSelected ? "ring-2 ring-blue-500 border-blue-500" : ""
+      }`}
     >
-      {/* Ícone de visualização */}
-      <div className="absolute top-2 right-2 z-10 transition-all duration-300 opacity-0 group-hover:opacity-100 scale-75 group-hover:scale-100">
-        <div className="bg-white/90 backdrop-blur-sm border border-blue-200 text-blue-600 rounded-full p-1.5 shadow-md">
-          <Eye className="h-3 w-3" />
-        </div>
-      </div>
-
       {/* Container da imagem */}
       <div className="relative aspect-square overflow-hidden bg-gradient-to-br from-gray-100 to-gray-200">
         <img 
@@ -44,6 +39,37 @@ export function ProductCard({ product, isSelected, onSelect, compact = false }: 
           alt={product.name} 
           className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" 
         />
+        
+        {/* Overlay gradiente sutil */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/10 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+        
+        {/* Badge de preço */}
+        <div className="absolute top-2 left-2 backdrop-blur-md bg-white/90 rounded-full px-2 py-1 shadow-sm border border-white/50">
+          <span className="text-xs font-bold text-blue-600">
+            R$ {product.price.toFixed(2)}
+          </span>
+        </div>
+
+        {/* Badges informativos (tamanho e marca) */}
+        <div className="absolute top-2 right-2 flex flex-col items-end gap-1">
+          {product.size && (
+            <div className="backdrop-blur-md bg-black/70 text-white rounded-md px-1.5 py-0.5">
+              <span className="text-[10px] font-medium">{product.size}</span>
+            </div>
+          )}
+          {product.brand && (
+            <div className="backdrop-blur-md bg-black/70 text-white rounded-md px-1.5 py-0.5">
+              <span className="text-[10px] font-medium">{product.brand}</span>
+            </div>
+          )}
+        </div>
+
+        {/* Ícone de visualização */}
+        <div className="absolute top-10 right-2 z-10 transition-all duration-300 opacity-0 group-hover:opacity-100 scale-75 group-hover:scale-100">
+          <div className="bg-white/90 backdrop-blur-sm border border-blue-200 text-blue-600 rounded-full p-1.5 shadow-md">
+            <Eye className="h-3 w-3" />
+          </div>
+        </div>
         
         {/* Navegação do carrossel - só aparece se houver mais de uma imagem */}
         {images.length > 1 && (
@@ -74,30 +100,6 @@ export function ProductCard({ product, isSelected, onSelect, compact = false }: 
             </div>
           </>
         )}
-        
-        {/* Overlay gradiente sutil */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/10 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-        
-        {/* Badge de preço flutuante */}
-        <div className="absolute top-2 left-2 backdrop-blur-md bg-white/90 rounded-full px-2 py-1 shadow-sm border border-white/50">
-          <span className="text-xs font-bold text-blue-600">
-            R$ {product.price.toFixed(2)}
-          </span>
-        </div>
-
-        {/* Badge de tamanho se existir */}
-        {product.size && (
-          <div className="absolute top-2 right-2 backdrop-blur-md bg-black/70 text-white rounded-md px-1.5 py-0.5">
-            <span className="text-[10px] font-medium">{product.size}</span>
-          </div>
-        )}
-
-        {/* Badge de marca se existir */}
-        {product.brand && (
-          <div className="absolute top-8 right-2 backdrop-blur-md bg-black/70 text-white rounded-md px-1.5 py-0.5">
-            <span className="text-[10px] font-medium">{product.brand}</span>
-          </div>
-        )}
       </div>
 
       {/* Conteúdo do card */}
@@ -125,17 +127,18 @@ export function ProductCard({ product, isSelected, onSelect, compact = false }: 
           {/* Indicador de estoque */}
           {product.stock !== undefined && (
             <div className={`text-[10px] font-medium ${
-              product.stock > 0 ? 'text-blue-600' : 'text-black'
+              product.stock > 0 ? 'text-blue-600' : 'text-rose-600'
             }`}>
               {product.stock > 0 ? `${product.stock} em estoque` : 'Sem estoque'}
             </div>
           )}
           
           {/* Indicador de ação */}
-          <div className="transition-all duration-300 text-gray-400 group-hover:text-blue-600">
-            <span className="text-[10px]">
+          <div className="flex items-center transition-all duration-300 text-gray-400 group-hover:text-blue-600">
+            <span className="text-[10px] mr-1">
               Ver detalhes
             </span>
+            <ShoppingCart className="h-3 w-3" />
           </div>
         </div>
       </div>
