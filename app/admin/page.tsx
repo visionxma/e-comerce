@@ -572,12 +572,16 @@ export default function AdminPage() {
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="stock">Estoque</Label>
-                      <Input
-                        id="stock"
-                        type="number"
-                        min="0"
-                        value={newProduct.stock}
-                        onChange={(e) => setNewProduct({ ...newProduct, stock: Number.parseInt(e.target.value) || 0 })}
+  <Input
+    id="stock"
+    type="number"
+    min="0"
+    value={newProduct.stock === 0 ? "" : newProduct.stock}
+    onChange={(e) => setNewProduct({ 
+      ...newProduct, 
+      stock: e.target.value === "" ? 0 : Number.parseInt(e.target.value) || 0 
+    })}
+    placeholder="Quantidade em estoque"
                         placeholder="Quantidade em estoque"
                       />
                     </div>
