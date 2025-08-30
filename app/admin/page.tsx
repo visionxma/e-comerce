@@ -7,11 +7,17 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Trash2, Edit, Plus, Save, X, LogOut, Image as ImageIcon, Eye, EyeOff } from "lucide-react"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { Badge } from "@/components/ui/badge"
+import { Skeleton } from "@/components/ui/skeleton"
+import { 
+  Trash2, Edit, Plus, Save, X, LogOut, Image as ImageIcon, Eye, EyeOff, 
+  Upload, Search, Filter, AlertCircle, ShoppingBag, Image
+} from "lucide-react"
 import { signInWithEmailAndPassword, signOut, onAuthStateChanged } from "firebase/auth"
 import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy } from "firebase/firestore"
 import { auth, db } from "@/lib/firebase"
@@ -43,6 +49,9 @@ export default function AdminPage() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [loginData, setLoginData] = useState({ email: "", password: "" })
+  const [searchTerm, setSearchTerm] = useState("")
+  const [selectedCategory, setSelectedCategory] = useState("all")
+  const [loginError, setLoginError] = useState("")
   
   const [newProduct, setNewProduct] = useState<Omit<Product, "id">>({
     name: "",
@@ -51,6 +60,9 @@ export default function AdminPage() {
     image: "",
     category: "",
     size: "",
+    brand: "",
+    stock: 0,
+    featured: false
   })
 
   const [newBanner, setNewBanner] = useState<Omit<Banner, "id" | "createdAt">>({
@@ -64,6 +76,17 @@ export default function AdminPage() {
     endDate: "",
     backgroundColor: "#059669",
     textColor: "#ffffff",
+  })
+
+  // Obter categorias únicas dos produtos
+  const categories = ["all", ...new Set(products.map(product => product.category).filter(Boolean))]
+
+  // Filtrar produtos
+  const filteredProducts = products.filter(product => {
+    const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                          product.description.toLowerCase().includes(searchTerm.toLowerCase())
+    const matchesCategory = selectedCategory === "all" || product.category === selectedCategory
+    return matchesSearch && matchesCategory
   })
 
   useEffect(() => {
@@ -111,10 +134,12 @@ export default function AdminPage() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
+    setLoginError("")
     try {
       await signInWithEmailAndPassword(auth, loginData.email, loginData.password)
-    } catch (error) {
-      alert("Erro ao fazer login. Verifique suas credenciais.")
+    } catch (error: any) {
+      console.error("Erro no login:", error)
+      setLoginError(error.message || "Erro ao fazer login. Verifique suas credenciais.")
     }
   }
 
@@ -122,52 +147,63 @@ export default function AdminPage() {
     try {
       await signOut(auth)
     } catch (error) {
-      alert("Erro ao fazer logout.")
+      console.error("Erro no logout:", error)
     }
   }
 
   const handleAddProduct = async () => {
-    if (newProduct.name && newProduct.price > 0) {
-      try {
-        await addDoc(collection(db, "products"), newProduct)
-        setNewProduct({
-          name: "",
-          description: "",
-          price: 0,
-          image: "",
-          category: "",
-          size: "",
-        })
-        setIsAddingNew(false)
-      } catch (error) {
-        alert("Erro ao adicionar produto.")
-      }
+    if (!newProduct.name || newProduct.price <= 0 || !newProduct.category) {
+      alert("Preencha os campos obrigatórios: Nome, Preço e Categoria.")
+      return
+    }
+    
+    try {
+      await addDoc(collection(db, "products"), newProduct)
+      setNewProduct({
+        name: "",
+        description: "",
+        price: 0,
+        image: "",
+        category: "",
+        size: "",
+        brand: "",
+        stock: 0,
+        featured: false
+      })
+      setIsAddingNew(false)
+    } catch (error) {
+      console.error("Erro ao adicionar produto:", error)
+      alert("Erro ao adicionar produto.")
     }
   }
 
   const handleAddBanner = async () => {
-    if (newBanner.title && newBanner.imageUrl) {
-      try {
-        await addDoc(collection(db, "banners"), {
-          ...newBanner,
-          createdAt: new Date()
-        })
-        setNewBanner({
-          title: "",
-          description: "",
-          imageUrl: "",
-          linkUrl: "",
-          isActive: true,
-          priority: 1,
-          startDate: "",
-          endDate: "",
-          backgroundColor: "#059669",
-          textColor: "#ffffff",
-        })
-        setIsAddingBanner(false)
-      } catch (error) {
-        alert("Erro ao adicionar banner.")
-      }
+    if (!newBanner.title || !newBanner.imageUrl) {
+      alert("Preencha os campos obrigatórios: Título e Imagem.")
+      return
+    }
+    
+    try {
+      await addDoc(collection(db, "banners"), {
+        ...newBanner,
+        createdAt: new Date()
+      })
+      setNewBanner({
+        title: "",
+        description: "",
+        imageUrl: "",
+        linkUrl: "",
+        isActive: true,
+        priority: 1,
+        startDate: "",
+        endDate: "",
+        backgroundColor: "#059669",
+        textColor: "#ffffff",
+      })
+      setIsAddingBanner(false)
+    } catch (error) {
+      console.error("Erro ao adicionar banner:", error)
+      alert("Erro ao adicionar banner.")
     }
   }
 
@@ -181,9 +217,13 @@ export default function AdminPage() {
         image: product.image,
         category: product.category,
         size: product.size,
+        brand: product.brand,
+        stock: product.stock,
+        featured: product.featured
       })
       setEditingProduct(null)
     } catch (error) {
+      console.error("Erro ao editar produto:", error)
       alert("Erro ao editar produto.")
     }
   }
@@ -205,25 +245,28 @@ export default function AdminPage() {
       })
       setEditingBanner(null)
     } catch (error) {
+      console.error("Erro ao editar banner:", error)
       alert("Erro ao editar banner.")
     }
   }
 
   const handleDeleteProduct = async (id: string) => {
-    if (confirm("Tem certeza que deseja excluir este produto?")) {
+    if (confirm("Tem certeza que deseja excluir este produto? Esta ação não pode ser desfeita.")) {
       try {
         await deleteDoc(doc(db, "products", id))
       } catch (error) {
+        console.error("Erro ao excluir produto:", error)
         alert("Erro ao excluir produto.")
       }
     }
   }
 
   const handleDeleteBanner = async (id: string) => {
-    if (confirm("Tem certeza que deseja excluir este banner?")) {
+    if (confirm("Tem certeza que deseja excluir este banner? Esta ação não pode ser desfeita.")) {
       try {
         await deleteDoc(doc(db, "banners", id))
       } catch (error) {
+        console.error("Erro ao excluir banner:", error)
         alert("Erro ao excluir banner.")
       }
     }
@@ -236,7 +279,37 @@ export default function AdminPage() {
         isActive: !banner.isActive
       })
     } catch (error) {
+      console.error("Erro ao alterar status do banner:", error)
       alert("Erro ao alterar status do banner.")
+    }
+  }
+
+  const uploadImage = async (file: File, type: 'product' | 'banner') => {
+    try {
+      const formData = new FormData()
+      formData.append("file", file)
+      formData.append("upload_preset", "banners_unsigned")
+
+      const response = await fetch("https://api.cloudinary.com/v1_1/dqvjdppqs/image/upload", {
+        method: "POST",
+        body: formData,
+      })
+
+      if (!response.ok) throw new Error("Falha no upload da imagem")
+
+      const data = await response.json()
+      
+      if (type === 'product') {
+        setNewProduct({ ...newProduct, image: data.secure_url })
+      } else {
+        setNewBanner({ ...newBanner, imageUrl: data.secure_url })
+      }
+      
+      return data.secure_url
+    } catch (error) {
+      console.error("Erro ao fazer upload da imagem:", error)
+      alert("Erro ao fazer upload da imagem. Tente novamente.")
+      return null
     }
   }
 
@@ -253,14 +326,29 @@ export default function AdminPage() {
 
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <Card className="w-full max-w-md">
-          <CardHeader>
-            <CardTitle className="text-center">Acesso Administrativo</CardTitle>
+      <div className="min-h-screen bg-background flex items-center justify-center p-4 bg-gradient-to-br from-slate-50 to-slate-100">
+        <Card className="w-full max-w-md shadow-lg">
+          <CardHeader className="space-y-1">
+            <div className="flex justify-center mb-4">
+              <div className="bg-primary rounded-full p-3">
+                <ShoppingBag className="h-8 w-8 text-primary-foreground" />
+              </div>
+            </div>
+            <CardTitle className="text-2xl text-center">Acesso Administrativo</CardTitle>
+            <CardDescription className="text-center">
+              Entre com suas credenciais para acessar o painel
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleLogin} className="space-y-4">
-              <div>
+              {loginError && (
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertTitle>Erro</AlertTitle>
+                  <AlertDescription>{loginError}</AlertDescription>
+                </Alert>
+              )}
+              <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
                 <Input
                   id="email"
@@ -269,9 +357,10 @@ export default function AdminPage() {
                   onChange={(e) => setLoginData({ ...loginData, email: e.target.value })}
                   placeholder="admin@exemplo.com"
                   required
+                  className="h-11"
                 />
               </div>
-              <div>
+              <div className="space-y-2">
                 <Label htmlFor="password">Senha</Label>
                 <Input
                   id="password"
@@ -280,9 +369,10 @@ export default function AdminPage() {
                   onChange={(e) => setLoginData({ ...loginData, password: e.target.value })}
                   placeholder="Sua senha"
                   required
+                  className="h-11"
                 />
               </div>
-              <Button type="submit" className="w-full">
+              <Button type="submit" className="w-full h-11 text-base">
                 Entrar
               </Button>
             </form>
@@ -294,78 +384,140 @@ export default function AdminPage() {
 
   return (
     <div className="min-h-screen bg-background p-4">
-      <div className="container mx-auto max-w-6xl">
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="text-3xl font-bold">Painel Administrativo - Ecommerce</h1>
-          <Button variant="outline" onClick={handleLogout} className="flex items-center gap-2">
+      <div className="container mx-auto max-w-7xl">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+          <div>
+            <h1 className="text-3xl font-bold">Painel Administrativo</h1>
+            <p className="text-muted-foreground">Gerencie seus produtos e banners promocionais</p>
+          </div>
+          <Button variant="outline" onClick={handleLogout} className="flex items-center gap-2 self-start sm:self-auto">
             <LogOut className="w-4 h-4" />
             Sair
           </Button>
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="products">Produtos ({products.length})</TabsTrigger>
-            <TabsTrigger value="banners">Banners ({banners.filter(b => b.isActive).length} ativos)</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-2 mb-6">
+            <TabsTrigger value="products" className="flex items-center gap-2">
+              <ShoppingBag className="w-4 h-4" />
+              Produtos ({products.length})
+            </TabsTrigger>
+            <TabsTrigger value="banners" className="flex items-center gap-2">
+              <Image className="w-4 h-4" />
+              Banners ({banners.filter(b => b.isActive).length} ativos)
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="products" className="space-y-6">
-            <div className="flex justify-between items-center">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
               <h2 className="text-2xl font-semibold">Gerenciar Produtos</h2>
-              <Button onClick={() => setIsAddingNew(true)} className="flex items-center gap-2">
+              <Button onClick={() => setIsAddingNew(true)} className="flex items-center gap-2 self-start sm:self-auto">
                 <Plus className="w-4 h-4" />
                 Adicionar Produto
               </Button>
             </div>
+
+            {/* Filtros e busca */}
+            <Card>
+              <CardContent className="pt-6">
+                <div className="flex flex-col md:flex-row gap-4">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Buscar produtos..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                      <SelectTrigger className="w-[180px]">
+                        <Filter className="w-4 h-4 mr-2" />
+                        <SelectValue placeholder="Filtrar por categoria" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todas categorias</SelectItem>
+                        {categories.filter(cat => cat !== "all").map(category => (
+                          <SelectItem key={category} value={category}>{category}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
 
             {/* Formulário para adicionar novo produto */}
             {isAddingNew && (
               <Card>
                 <CardHeader>
                   <CardTitle>Adicionar Novo Produto</CardTitle>
+                  <CardDescription>Preencha os dados do novo produto</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
+                    <div className="space-y-2">
                       <Label htmlFor="name">Nome do Produto *</Label>
                       <Input
                         id="name"
                         value={newProduct.name}
                         onChange={(e) => setNewProduct({ ...newProduct, name: e.target.value })}
-                        placeholder="Ex: Smartphone Samsung Galaxy, Tênis Nike Air Max..."
+                        placeholder="Ex: Smartphone Samsung Galaxy"
                       />
                     </div>
-                    <div>
+                    <div className="space-y-2">
                       <Label htmlFor="price">Preço (R$) *</Label>
                       <Input
                         id="price"
                         type="number"
                         step="0.01"
+                        min="0"
                         value={newProduct.price}
                         onChange={(e) => setNewProduct({ ...newProduct, price: Number.parseFloat(e.target.value) || 0 })}
                         placeholder="299.99"
                       />
                     </div>
-                    <div>
+                    <div className="space-y-2">
                       <Label htmlFor="category">Categoria *</Label>
                       <Input
                         id="category"
                         value={newProduct.category}
                         onChange={(e) => setNewProduct({ ...newProduct, category: e.target.value })}
-                        placeholder="Ex: Eletrônicos, Roupas, Casa & Jardim, Esportes..."
+                        placeholder="Ex: Eletrônicos"
                       />
                     </div>
-                    <div>
+                    <div className="space-y-2">
                       <Label htmlFor="size">Tamanho/Especificação</Label>
                       <Input
                         id="size"
                         value={newProduct.size}
                         onChange={(e) => setNewProduct({ ...newProduct, size: e.target.value })}
-                        placeholder="Ex: M, 128GB, 40cm, 500ml..."
+                        placeholder="Ex: M, 128GB"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="brand">Marca</Label>
+                      <Input
+                        id="brand"
+                        value={newProduct.brand}
+                        onChange={(e) => setNewProduct({ ...newProduct, brand: e.target.value })}
+                        placeholder="Ex: Samsung, Nike"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="stock">Estoque</Label>
+                      <Input
+                        id="stock"
+                        type="number"
+                        min="0"
+                        value={newProduct.stock}
+                        onChange={(e) => setNewProduct({ ...newProduct, stock: Number.parseInt(e.target.value) || 0 })}
+                        placeholder="Quantidade em estoque"
                       />
                     </div>
                   </div>
-                  <div>
+                  <div className="space-y-2">
                     <Label htmlFor="description">Descrição do Produto</Label>
                     <Textarea
                       id="description"
@@ -375,32 +527,51 @@ export default function AdminPage() {
                       rows={3}
                     />
                   </div>
-<div>
-  <Label htmlFor="image">Imagem do Produto</Label>
-  <Input
-    id="image"
-    type="file"
-    accept="image/*"
-    onChange={async (e) => {
-      const file = e.target.files?.[0]
-      if (!file) return
-
-      const formData = new FormData()
-      formData.append("file", file)
-      formData.append("upload_preset", "banners_unsigned") // preset que vc mostrou
-
-      // Faz upload direto no Cloudinary
-      const res = await fetch("https://api.cloudinary.com/v1_1/dqvjdppqs/image/upload", {
-        method: "POST",
-        body: formData,
-      })
-
-      const data = await res.json()
-      setNewProduct({ ...newProduct, image: data.secure_url }) // aqui fica a URL pública
-    }}
-  />
-</div>
-                  <div className="flex gap-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="image">Imagem do Produto</Label>
+                    <div className="flex items-center gap-4">
+                      <Input
+                        id="image"
+                        type="file"
+                        accept="image/*"
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0]
+                          if (file) await uploadImage(file, 'product')
+                        }}
+                        className="flex-1"
+                      />
+                      <Button 
+                        type="button" 
+                        variant="outline" 
+                        className="flex items-center gap-2"
+                        onClick={() => {
+                          const input = document.getElementById('image') as HTMLInputElement
+                          input?.click()
+                        }}
+                      >
+                        <Upload className="w-4 h-4" />
+                        Upload
+                      </Button>
+                    </div>
+                    {newProduct.image && (
+                      <div className="mt-2">
+                        <img
+                          src={newProduct.image}
+                          alt="Preview"
+                          className="w-32 h-32 object-contain border rounded-md"
+                        />
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Switch
+                      id="featured"
+                      checked={newProduct.featured}
+                      onCheckedChange={(checked) => setNewProduct({ ...newProduct, featured: checked })}
+                    />
+                    <Label htmlFor="featured">Produto em Destaque</Label>
+                  </div>
+                  <div className="flex gap-2 pt-4">
                     <Button onClick={handleAddProduct} className="flex items-center gap-2">
                       <Save className="w-4 h-4" />
                       Salvar Produto
@@ -415,92 +586,134 @@ export default function AdminPage() {
             )}
 
             {/* Lista de produtos */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {products.map((product) => (
-                <Card key={product.id}>
-                  <CardContent className="p-4">
-                    {editingProduct?.id === product.id ? (
-                      <div className="space-y-3">
-                        <Input
-                          value={editingProduct.name}
-                          onChange={(e) => setEditingProduct({ ...editingProduct, name: e.target.value })}
-                          placeholder="Nome do produto"
-                        />
-                        <Input
-                          type="number"
-                          step="0.01"
-                          value={editingProduct.price}
-                          onChange={(e) =>
-                            setEditingProduct({ ...editingProduct, price: Number.parseFloat(e.target.value) || 0 })
-                          }
-                          placeholder="Preço"
-                        />
-                        <Input
-                          value={editingProduct.category}
-                          onChange={(e) => setEditingProduct({ ...editingProduct, category: e.target.value })}
-                          placeholder="Categoria"
-                        />
-                        <div className="flex gap-2">
-                          <Button
-                            size="sm"
-                            onClick={() => handleEditProduct(editingProduct)}
-                            className="flex items-center gap-1"
-                          >
-                            <Save className="w-3 h-3" />
-                            Salvar
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => setEditingProduct(null)}
-                            className="flex items-center gap-1"
-                          >
-                            <X className="w-3 h-3" />
-                            Cancelar
-                          </Button>
+            {filteredProducts.length === 0 ? (
+              <Card>
+                <CardContent className="p-8 text-center">
+                  <ShoppingBag className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
+                  <h3 className="text-xl font-semibold mb-2">
+                    {searchTerm || selectedCategory !== "all" ? "Nenhum produto encontrado" : "Nenhum produto cadastrado"}
+                  </h3>
+                  <p className="text-muted-foreground mb-4">
+                    {searchTerm || selectedCategory !== "all" 
+                      ? "Tente ajustar os filtros de busca ou categoria" 
+                      : "Adicione seu primeiro produto para começar!"}
+                  </p>
+                  <Button onClick={() => setIsAddingNew(true)} className="flex items-center gap-2 mx-auto">
+                    <Plus className="w-4 h-4" />
+                    Adicionar Produto
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {filteredProducts.map((product) => (
+                  <Card key={product.id} className={`overflow-hidden ${product.featured ? 'border-primary border-2' : ''}`}>
+                    <div className="relative">
+                      <img
+                        src={product.image || "/placeholder.svg"}
+                        alt={product.name}
+                        className="w-full h-48 object-cover"
+                      />
+                      {product.featured && (
+                        <Badge className="absolute top-2 left-2 bg-primary">Destaque</Badge>
+                      )}
+                      {product.stock !== undefined && product.stock <= 0 && (
+                        <Badge variant="destructive" className="absolute top-2 right-2">Sem Estoque</Badge>
+                      )}
+                    </div>
+                    <CardContent className="p-4">
+                      {editingProduct?.id === product.id ? (
+                        <div className="space-y-3">
+                          <Input
+                            value={editingProduct.name}
+                            onChange={(e) => setEditingProduct({ ...editingProduct, name: e.target.value })}
+                            placeholder="Nome do produto"
+                          />
+                          <div className="grid grid-cols-2 gap-2">
+                            <Input
+                              type="number"
+                              step="0.01"
+                              value={editingProduct.price}
+                              onChange={(e) =>
+                                setEditingProduct({ ...editingProduct, price: Number.parseFloat(e.target.value) || 0 })
+                              }
+                              placeholder="Preço"
+                            />
+                            <Input
+                              value={editingProduct.category}
+                              onChange={(e) => setEditingProduct({ ...editingProduct, category: e.target.value })}
+                              placeholder="Categoria"
+                            />
+                          </div>
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              onClick={() => handleEditProduct(editingProduct)}
+                              className="flex items-center gap-1"
+                            >
+                              <Save className="w-3 h-3" />
+                              Salvar
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setEditingProduct(null)}
+                              className="flex items-center gap-1"
+                            >
+                              <X className="w-3 h-3" />
+                              Cancelar
+                            </Button>
+                          </div>
                         </div>
-                      </div>
-                    ) : (
-                      <div>
-                        <img
-                          src={product.image || "/placeholder.svg"}
-                          alt={product.name}
-                          className="w-full h-32 object-cover rounded mb-3"
-                        />
-                        <h3 className="font-semibold text-lg mb-1">{product.name}</h3>
-                        <p className="text-lg font-bold text-primary mb-3">R$ {product.price.toFixed(2)}</p>
-                        <div className="flex gap-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => setEditingProduct(product)}
-                            className="flex items-center gap-1"
-                          >
-                            <Edit className="w-3 h-3" />
-                            Editar
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            onClick={() => handleDeleteProduct(product.id)}
-                            className="flex items-center gap-1"
-                          >
-                            <Trash2 className="w-3 h-3" />
-                            Excluir
-                          </Button>
+                      ) : (
+                        <div>
+                          <h3 className="font-semibold text-lg mb-1 line-clamp-1">{product.name}</h3>
+                          <div className="flex items-center justify-between mb-2">
+                            <p className="text-lg font-bold text-primary">R$ {product.price.toFixed(2)}</p>
+                            {product.stock !== undefined && (
+                              <Badge variant={product.stock > 0 ? "outline" : "destructive"}>
+                                {product.stock > 0 ? `${product.stock} em estoque` : "Sem estoque"}
+                              </Badge>
+                            )}
+                          </div>
+                          <div className="flex flex-wrap gap-1 mb-3">
+                            <Badge variant="secondary" className="text-xs">{product.category}</Badge>
+                            {product.brand && <Badge variant="outline" className="text-xs">{product.brand}</Badge>}
+                            {product.size && <Badge variant="outline" className="text-xs">{product.size}</Badge>}
+                          </div>
+                          <p className="text-sm text-muted-foreground mb-3 line-clamp-2">{product.description}</p>
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setEditingProduct(product)}
+                              className="flex items-center gap-1 flex-1"
+                            >
+                              <Edit className="w-3 h-3" />
+                              Editar
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              onClick={() => handleDeleteProduct(product.id)}
+                              className="flex items-center gap-1"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </Button>
+                          </div>
                         </div>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
           </TabsContent>
 
           <TabsContent value="banners" className="space-y-6">
-            <div className="flex justify-between items-center">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
               <h2 className="text-2xl font-semibold">Gerenciar Banners Promocionais</h2>
-              <Button onClick={() => setIsAddingBanner(true)} className="flex items-center gap-2">
+              <Button onClick={() => setIsAddingBanner(true)} className="flex items-center gap-2 self-start sm:self-auto">
                 <Plus className="w-4 h-4" />
                 Adicionar Banner
               </Button>
@@ -511,10 +724,11 @@ export default function AdminPage() {
               <Card>
                 <CardHeader>
                   <CardTitle>Criar Novo Banner Promocional</CardTitle>
+                  <CardDescription>Configure o banner para suas campanhas promocionais</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
+                    <div className="space-y-2">
                       <Label htmlFor="banner-title">Título do Banner *</Label>
                       <Input
                         id="banner-title"
@@ -523,7 +737,7 @@ export default function AdminPage() {
                         placeholder="Ex: MEGA PROMOÇÃO - 50% OFF"
                       />
                     </div>
-                    <div>
+                    <div className="space-y-2">
                       <Label htmlFor="banner-priority">Prioridade (1-10)</Label>
                       <Input
                         id="banner-priority"
@@ -535,7 +749,7 @@ export default function AdminPage() {
                         placeholder="1"
                       />
                     </div>
-                    <div>
+                    <div className="space-y-2">
                       <Label htmlFor="banner-start">Data de Início</Label>
                       <Input
                         id="banner-start"
@@ -544,7 +758,7 @@ export default function AdminPage() {
                         onChange={(e) => setNewBanner({ ...newBanner, startDate: e.target.value })}
                       />
                     </div>
-                    <div>
+                    <div className="space-y-2">
                       <Label htmlFor="banner-end">Data de Fim</Label>
                       <Input
                         id="banner-end"
@@ -553,26 +767,44 @@ export default function AdminPage() {
                         onChange={(e) => setNewBanner({ ...newBanner, endDate: e.target.value })}
                       />
                     </div>
-                    <div>
+                    <div className="space-y-2">
                       <Label htmlFor="banner-bg">Cor de Fundo</Label>
-                      <Input
-                        id="banner-bg"
-                        type="color"
-                        value={newBanner.backgroundColor}
-                        onChange={(e) => setNewBanner({ ...newBanner, backgroundColor: e.target.value })}
-                      />
+                      <div className="flex items-center gap-2">
+                        <Input
+                          id="banner-bg"
+                          type="color"
+                          value={newBanner.backgroundColor}
+                          onChange={(e) => setNewBanner({ ...newBanner, backgroundColor: e.target.value })}
+                          className="w-12 h-12 p-1"
+                        />
+                        <Input
+                          value={newBanner.backgroundColor}
+                          onChange={(e) => setNewBanner({ ...newBanner, backgroundColor: e.target.value })}
+                          placeholder="#059669"
+                          className="flex-1"
+                        />
+                      </div>
                     </div>
-                    <div>
+                    <div className="space-y-2">
                       <Label htmlFor="banner-text-color">Cor do Texto</Label>
-                      <Input
-                        id="banner-text-color"
-                        type="color"
-                        value={newBanner.textColor}
-                        onChange={(e) => setNewBanner({ ...newBanner, textColor: e.target.value })}
-                      />
+                      <div className="flex items-center gap-2">
+                        <Input
+                          id="banner-text-color"
+                          type="color"
+                          value={newBanner.textColor}
+                          onChange={(e) => setNewBanner({ ...newBanner, textColor: e.target.value })}
+                          className="w-12 h-12 p-1"
+                        />
+                        <Input
+                          value={newBanner.textColor}
+                          onChange={(e) => setNewBanner({ ...newBanner, textColor: e.target.value })}
+                          placeholder="#ffffff"
+                          className="flex-1"
+                        />
+                      </div>
                     </div>
                   </div>
-                  <div>
+                  <div className="space-y-2">
                     <Label htmlFor="banner-description">Descrição</Label>
                     <Textarea
                       id="banner-description"
@@ -582,49 +814,43 @@ export default function AdminPage() {
                       rows={2}
                     />
                   </div>
-<div>
-  <Label htmlFor="banner-image">Imagem do Banner *</Label>
-  <Input
-    id="banner-image"
-    type="file"
-    accept="image/*"
-    onChange={async (e) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
-
-      // Cria o FormData
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("upload_preset", "banners_unsigned"); // 🔹 troque pelo nome do preset unsigned que você criou no Cloudinary
-
-      try {
-        // Faz upload para o Cloudinary
-        const res = await fetch("https://api.cloudinary.com/v1_1/dqvjdppqs/image/upload", {
-          method: "POST",
-          body: formData,
-        });
-
-        const data = await res.json();
-        const url = data.secure_url; // URL pública da imagem
-
-        // Atualiza estado do banner
-        setNewBanner({ ...newBanner, imageUrl: url });
-      } catch (error) {
-        console.error("Erro ao enviar imagem para Cloudinary:", error);
-      }
-    }}
-  />
-
-  {/* Pré-visualização da imagem escolhida */}
-  {newBanner.imageUrl && (
-    <img
-      src={newBanner.imageUrl}
-      alt="Pré-visualização"
-      className="mt-2 w-32 h-20 object-cover rounded"
-    />
-  )}
-</div>
-                  <div>
+                  <div className="space-y-2">
+                    <Label htmlFor="banner-image">Imagem do Banner *</Label>
+                    <div className="flex items-center gap-4">
+                      <Input
+                        id="banner-image"
+                        type="file"
+                        accept="image/*"
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0]
+                          if (file) await uploadImage(file, 'banner')
+                        }}
+                        className="flex-1"
+                      />
+                      <Button 
+                        type="button" 
+                        variant="outline" 
+                        className="flex items-center gap-2"
+                        onClick={() => {
+                          const input = document.getElementById('banner-image') as HTMLInputElement
+                          input?.click()
+                        }}
+                      >
+                        <Upload className="w-4 h-4" />
+                        Upload
+                      </Button>
+                    </div>
+                    {newBanner.imageUrl && (
+                      <div className="mt-2">
+                        <img
+                          src={newBanner.imageUrl}
+                          alt="Preview"
+                          className="w-full h-40 object-contain border rounded-md"
+                        />
+                      </div>
+                    )}
+                  </div>
+                  <div className="space-y-2">
                     <Label htmlFor="banner-link">Link de Destino (opcional)</Label>
                     <Input
                       id="banner-link"
@@ -641,7 +867,7 @@ export default function AdminPage() {
                     />
                     <Label htmlFor="banner-active">Banner Ativo</Label>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 pt-4">
                     <Button onClick={handleAddBanner} className="flex items-center gap-2">
                       <Save className="w-4 h-4" />
                       Salvar Banner
@@ -656,112 +882,7 @@ export default function AdminPage() {
             )}
 
             {/* Lista de banners */}
-            <div className="space-y-4">
-              {banners.map((banner) => (
-                <Card key={banner.id} className={`${!banner.isActive ? 'opacity-60' : ''}`}>
-                  <CardContent className="p-4">
-                    {editingBanner?.id === banner.id ? (
-                      <div className="space-y-4">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <Input
-                            value={editingBanner.title}
-                            onChange={(e) => setEditingBanner({ ...editingBanner, title: e.target.value })}
-                            placeholder="Título do banner"
-                          />
-                          <Input
-                            type="number"
-                            min="1"
-                            max="10"
-                            value={editingBanner.priority}
-                            onChange={(e) => setEditingBanner({ ...editingBanner, priority: parseInt(e.target.value) || 1 })}
-                            placeholder="Prioridade"
-                          />
-                        </div>
-                        <div className="flex gap-2">
-                          <Button
-                            size="sm"
-                            onClick={() => handleEditBanner(editingBanner)}
-                            className="flex items-center gap-1"
-                          >
-                            <Save className="w-3 h-3" />
-                            Salvar
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => setEditingBanner(null)}
-                            className="flex items-center gap-1"
-                          >
-                            <X className="w-3 h-3" />
-                            Cancelar
-                          </Button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-4">
-                        <img
-                          src={banner.imageUrl || "/placeholder.svg"}
-                          alt={banner.title}
-                          className="w-24 h-16 object-cover rounded"
-                        />
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-1">
-                            <h3 className="font-semibold text-lg">{banner.title}</h3>
-                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                              banner.isActive ? 'bg-success/20 text-success' : 'bg-muted text-muted-foreground'
-                            }`}>
-                              {banner.isActive ? 'Ativo' : 'Inativo'}
-                            </span>
-                            <span className="px-2 py-1 bg-primary/20 text-primary rounded-full text-xs font-medium">
-                              Prioridade: {banner.priority}
-                            </span>
-                          </div>
-                          {banner.description && (
-                            <p className="text-sm text-muted-foreground mb-2">{banner.description}</p>
-                          )}
-                          {banner.startDate && (
-                            <p className="text-xs text-muted-foreground">
-                              Período: {banner.startDate} {banner.endDate && `até ${banner.endDate}`}
-                            </p>
-                          )}
-                        </div>
-                        <div className="flex gap-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => toggleBannerStatus(banner)}
-                            className="flex items-center gap-1"
-                          >
-                            {banner.isActive ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
-                            {banner.isActive ? 'Desativar' : 'Ativar'}
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => setEditingBanner(banner)}
-                            className="flex items-center gap-1"
-                          >
-                            <Edit className="w-3 h-3" />
-                            Editar
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            onClick={() => handleDeleteBanner(banner.id)}
-                            className="flex items-center gap-1"
-                          >
-                            <Trash2 className="w-3 h-3" />
-                            Excluir
-                          </Button>
-                        </div>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-
-            {banners.length === 0 && (
+            {banners.length === 0 ? (
               <Card>
                 <CardContent className="p-8 text-center">
                   <ImageIcon className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
@@ -769,25 +890,148 @@ export default function AdminPage() {
                   <p className="text-muted-foreground mb-4">
                     Crie banners promocionais para destacar suas ofertas especiais!
                   </p>
-                  <Button onClick={() => setIsAddingBanner(true)} className="flex items-center gap-2">
+                  <Button onClick={() => setIsAddingBanner(true)} className="flex items-center gap-2 mx-auto">
                     <Plus className="w-4 h-4" />
                     Criar Primeiro Banner
                   </Button>
                 </CardContent>
               </Card>
+            ) : (
+              <div className="space-y-4">
+                {banners.map((banner) => (
+                  <Card key={banner.id} className={`${!banner.isActive ? 'opacity-70' : ''}`}>
+                    <CardContent className="p-4">
+                      {editingBanner?.id === banner.id ? (
+                        <div className="space-y-4">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <Input
+                              value={editingBanner.title}
+                              onChange={(e) => setEditingBanner({ ...editingBanner, title: e.target.value })}
+                              placeholder="Título do banner"
+                            />
+                            <Input
+                              type="number"
+                              min="1"
+                              max="10"
+                              value={editingBanner.priority}
+                              onChange={(e) => setEditingBanner({ ...editingBanner, priority: parseInt(e.target.value) || 1 })}
+                              placeholder="Prioridade"
+                            />
+                          </div>
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              onClick={() => handleEditBanner(editingBanner)}
+                              className="flex items-center gap-1"
+                            >
+                              <Save className="w-3 h-3" />
+                              Salvar
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setEditingBanner(null)}
+                              className="flex items-center gap-1"
+                            >
+                              <X className="w-3 h-3" />
+                              Cancelar
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex flex-col md:flex-row items-start gap-4">
+                          <img
+                            src={banner.imageUrl || "/placeholder.svg"}
+                            alt={banner.title}
+                            className="w-full md:w-48 h-32 object-cover rounded"
+                          />
+                          <div className="flex-1">
+                            <div className="flex flex-wrap items-center gap-2 mb-2">
+                              <h3 className="font-semibold text-lg">{banner.title}</h3>
+                              <Badge className={
+                                banner.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                              }>
+                                {banner.isActive ? 'Ativo' : 'Inativo'}
+                              </Badge>
+                              <Badge variant="outline" className="bg-blue-100 text-blue-800">
+                                Prioridade: {banner.priority}
+                              </Badge>
+                            </div>
+                            {banner.description && (
+                              <p className="text-sm text-muted-foreground mb-2">{banner.description}</p>
+                            )}
+                            {banner.startDate && (
+                              <p className="text-xs text-muted-foreground">
+                                Período: {banner.startDate} {banner.endDate && `até ${banner.endDate}`}
+                              </p>
+                            )}
+                            {banner.linkUrl && (
+                              <p className="text-xs text-muted-foreground mt-1">
+                                Link: <a href={banner.linkUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">{banner.linkUrl}</a>
+                              </p>
+                            )}
+                          </div>
+                          <div className="flex gap-2 self-start md:self-auto">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => toggleBannerStatus(banner)}
+                              className="flex items-center gap-1"
+                            >
+                              {banner.isActive ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                              {banner.isActive ? 'Desativar' : 'Ativar'}
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setEditingBanner(banner)}
+                              className="flex items-center gap-1"
+                            >
+                              <Edit className="w-3 h-3" />
+                              Editar
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              onClick={() => handleDeleteBanner(banner.id)}
+                              className="flex items-center gap-1"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                              Excluir
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
             )}
           </TabsContent>
         </Tabs>
 
-        <div className="mt-8 p-4 bg-muted rounded-lg">
-          <h3 className="font-semibold mb-2">Informações do Sistema:</h3>
-          <p className="text-sm text-muted-foreground">
-            • <strong>Produtos:</strong> Gerencie seu catálogo completo de produtos
-            <br />• <strong>Banners:</strong> Crie campanhas promocionais com imagens e datas
-            <br />• <strong>Prioridade:</strong> Banners com maior prioridade aparecem primeiro
-            <br />• <strong>Status:</strong> Ative/desative banners sem precisar excluí-los
-            <br />• <strong>Tempo real:</strong> Todas as alterações aparecem instantaneamente no site
-          </p>
+        <div className="mt-8 p-6 bg-muted rounded-lg">
+          <h3 className="font-semibold mb-3 text-lg">Informações do Sistema:</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+            <div>
+              <h4 className="font-medium mb-2">📦 Gerenciamento de Produtos</h4>
+              <ul className="space-y-1 text-muted-foreground">
+                <li>• Adicione, edite ou remova produtos</li>
+                <li>• Controle de estoque e preços</li>
+                <li>• Destaque produtos especiais</li>
+                <li>• Organize por categorias</li>
+              </ul>
+            </div>
+            <div>
+              <h4 className="font-medium mb-2">🎯 Gerenciamento de Banners</h4>
+              <ul className="space-y-1 text-muted-foreground">
+                <li>• Crie campanhas promocionais</li>
+                <li>• Defina datas e prioridades</li>
+                <li>• Customize cores e estilos</li>
+                <li>• Ative/desative conforme necessidade</li>
+              </ul>
+            </div>
+          </div>
         </div>
       </div>
     </div>
