@@ -1,3 +1,5 @@
+// app/admin/page.tsx
+
 "use client"
 
 import type React from "react"
@@ -992,10 +994,10 @@ export default function AdminPage() {
                         </div>
                       ) : (
                         <div className="flex flex-col md:flex-row items-start gap-4">
-                          {product.images && product.images.length > 0 ? (
+                          {banner.imageUrl ? (
                             <img
-                              src={product.images[0]}
-                              alt={product.name}
+                              src={banner.imageUrl}
+                              alt={banner.title}
                               className="w-full md:w-48 h-32 object-cover rounded"
                             />
                           ) : (
