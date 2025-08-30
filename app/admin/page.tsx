@@ -4,7 +4,7 @@
 
 import type React from "react"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -54,6 +54,7 @@ export default function AdminPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedCategory, setSelectedCategory] = useState("all")
   const [loginError, setLoginError] = useState("")
+  const [uploadingImages, setUploadingImages] = useState<boolean[]>([])
   
   const [newProduct, setNewProduct] = useState<Omit<Product, "id">>({
     name: "",
@@ -79,6 +80,8 @@ export default function AdminPage() {
     backgroundColor: "#059669",
     textColor: "#ffffff",
   })
+
+  const fileInputRefs = useRef<(HTMLInputElement | null)[]>([])
 
   // Obter categorias únicas dos produtos
   const categories = ["all", ...new Set(products.map(product => product.category).filter(Boolean))]
@@ -252,7 +255,7 @@ export default function AdminPage() {
     }
   }
 
-  const handleDeleteProduct = async (id: string) => {
+  const handleDeleteProduct = async (id: string) {
     if (confirm("Tem certeza que deseja excluir este produto? Esta ação não pode ser desfeita.")) {
       try {
         await deleteDoc(doc(db, "products", id))
@@ -286,8 +289,13 @@ export default function AdminPage() {
     }
   }
 
-  const uploadImage = async (file: File, type: 'product' | 'banner', productImageIndex?: number) => {
+  const uploadImage = async (file: File, index: number) => {
     try {
+      // Atualiza o estado para mostrar que está carregando
+      const newUploadingImages = [...uploadingImages]
+      newUploadingImages[index] = true
+      setUploadingImages(newUploadingImages)
+
       const formData = new FormData()
       formData.append("file", file)
       formData.append("upload_preset", "banners_unsigned")
@@ -301,17 +309,42 @@ export default function AdminPage() {
 
       const data = await response.json()
       
-      if (type === 'product') {
-        if (productImageIndex !== undefined) {
-          const newImages = [...newProduct.images]
-          newImages[productImageIndex] = data.secure_url
-          setNewProduct({ ...newProduct, images: newImages })
-        } else {
-          setNewProduct({ ...newProduct, images: [...newProduct.images, data.secure_url] })
-        }
-      } else {
-        setNewBanner({ ...newBanner, imageUrl: data.secure_url })
-      }
+      const newImages = [...newProduct.images]
+      newImages[index] = data.secure_url
+      setNewProduct({ ...newProduct, images: newImages })
+
+      // Remove o estado de carregamento
+      newUploadingImages[index] = false
+      setUploadingImages(newUploadingImages)
+      
+      return data.secure_url
+    } catch (error) {
+      console.error("Erro ao fazer upload da imagem:", error)
+      alert("Erro ao fazer upload da imagem. Tente novamente.")
+      
+      // Remove o estado de carregamento em caso de erro
+      const newUploadingImages = [...uploadingImages]
+      newUploadingImages[index] = false
+      setUploadingImages(newUploadingImages)
+      return null
+    }
+  }
+
+  const uploadBannerImage = async (file: File) => {
+    try {
+      const formData = new FormData()
+      formData.append("file", file)
+      formData.append("upload_preset", "banners_unsigned")
+
+      const response = await fetch("https://api.cloudinary.com/v1_1/dqvjdppqs/image/upload", {
+        method: "POST",
+        body: formData,
+      })
+
+      if (!response.ok) throw new Error("Falha no upload da imagem")
+
+      const data = await response.json()
+      setNewBanner({ ...newBanner, imageUrl: data.secure_url })
       
       return data.secure_url
     } catch (error) {
@@ -324,12 +357,21 @@ export default function AdminPage() {
   const addProductImage = () => {
     if (newProduct.images.length < 3) {
       setNewProduct({ ...newProduct, images: [...newProduct.images, ""] })
+      setUploadingImages([...uploadingImages, false])
     }
   }
 
   const removeProductImage = (index: number) => {
     const newImages = newProduct.images.filter((_, i) => i !== index)
+    const newUploadingImages = uploadingImages.filter((_, i) => i !== index)
     setNewProduct({ ...newProduct, images: newImages })
+    setUploadingImages(newUploadingImages)
+  }
+
+  const handleFileSelect = (index: number, files: FileList | null) => {
+    if (files && files[0]) {
+      uploadImage(files[0], index)
+    }
   }
 
   if (isLoading) {
@@ -563,27 +605,31 @@ export default function AdminPage() {
                             </Button>
                           </div>
                           <div className="flex items-center gap-4">
-                            <Input
+                            <input
                               type="file"
                               accept="image/*"
-                              onChange={async (e) => {
-                                const file = e.target.files?.[0]
-                                if (file) await uploadImage(file, 'product', index)
-                              }}
-                              className="flex-1"
+                              ref={el => fileInputRefs.current[index] = el}
+                              onChange={(e) => handleFileSelect(index, e.target.files)}
+                              className="hidden"
                             />
                             <Button 
                               type="button" 
                               variant="outline" 
                               className="flex items-center gap-2"
-                              onClick={() => {
-                                const inputs = document.querySelectorAll('input[type="file"]')
-                                const input = inputs[index + 1] as HTMLInputElement // +1 porque o primeiro é do banner
-                                input?.click()
-                              }}
+                              onClick={() => fileInputRefs.current[index]?.click()}
+                              disabled={uploadingImages[index]}
                             >
-                              <Upload className="w-4 h-4" />
-                              Upload
+                              {uploadingImages[index] ? (
+                                <>
+                                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary mr-2"></div>
+                                  Enviando...
+                                </>
+                              ) : (
+                                <>
+                                  <Upload className="w-4 h-4" />
+                                  Selecionar Imagem
+                                </>
+                              )}
                             </Button>
                           </div>
                           {image && (
@@ -877,7 +923,7 @@ export default function AdminPage() {
                         accept="image/*"
                         onChange={async (e) => {
                           const file = e.target.files?.[0]
-                          if (file) await uploadImage(file, 'banner')
+                          if (file) await uploadBannerImage(file)
                         }}
                         className="flex-1"
                       />
