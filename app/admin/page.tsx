@@ -535,9 +535,12 @@ export default function AdminPage() {
     type="number"
     step="0.01"
     min="0"
-                        value={newProduct.price}
-                        onChange={(e) => setNewProduct({ ...newProduct, price: Number.parseFloat(e.target.value) || 0 })}
-                        placeholder="299.99"
+    value={newProduct.price === 0 ? "" : newProduct.price}
+    onChange={(e) => setNewProduct({ 
+      ...newProduct, 
+      price: e.target.value === "" ? 0 : Number.parseFloat(e.target.value) 
+    })}
+    placeholder="299.99"
                       />
                     </div>
                     <div className="space-y-2">
