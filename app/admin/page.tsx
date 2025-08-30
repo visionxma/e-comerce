@@ -737,23 +737,25 @@ export default function AdminPage() {
                             onChange={(e) => setEditingProduct({ ...editingProduct, name: e.target.value })}
                             placeholder="Nome do produto"
                           />
-                          <div className="grid grid-cols-2 gap-2">
-                            <Input
-                              type="number"
-                              step="0.01"
-                              value={editingProduct.price}
-                              onChange={(e) =>
-                                setEditingProduct({ ...editingProduct, price: Number.parseFloat(e.target.value) || 0 })
-                              }
-                              placeholder="Preço"
-                            />
-                            <Input
-                              value={editingProduct.category}
-                              onChange={(e) => setEditingProduct({ ...editingProduct, category: e.target.value })}
-                              placeholder="Categoria"
-                            />
-                          </div>
-                          <div className="flex gap-2">
+<div className="grid grid-cols-2 gap-2">
+  <Input
+    type="number"
+    step="0.01"
+    value={editingProduct.price === 0 ? "" : editingProduct.price}
+    onChange={(e) =>
+      setEditingProduct({ 
+        ...editingProduct, 
+        price: e.target.value === "" ? 0 : Number.parseFloat(e.target.value) || 0 
+      })
+    }
+    placeholder="Preço"
+  />
+  <Input
+    value={editingProduct.category}
+    onChange={(e) => setEditingProduct({ ...editingProduct, category: e.target.value })}
+    placeholder="Categoria"
+  />
+</div>                          <div className="flex gap-2">
                             <Button
                               size="sm"
                               onClick={() => handleEditProduct(editingProduct)}
