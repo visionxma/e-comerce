@@ -530,11 +530,11 @@ export default function AdminPage() {
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="price">Preço (R$) *</Label>
-                      <Input
-                        id="price"
-                        type="number"
-                        step="0.01"
-                        min="0"
+  <Input
+    id="price"
+    type="number"
+    step="0.01"
+    min="0"
                         value={newProduct.price}
                         onChange={(e) => setNewProduct({ ...newProduct, price: Number.parseFloat(e.target.value) || 0 })}
                         placeholder="299.99"
