@@ -250,6 +250,15 @@ Gostaria de confirmar este pedido! 🙏`
                     </Button>
                     <Button
                       onClick={() => setIsOpen(false)}
+                      variant="outline"
+                      className="flex-1"
+                      disabled={isProcessing}
+                    >
+                      <X className="h-4 w-4 mr-1" />
+                      Fechar
+                    </Button>
+                    <Button
+                      onClick={() => setIsOpen(false)}
                       variant="ghost"
                       className="flex-1"
                       disabled={isProcessing}
