@@ -5,73 +5,14 @@ import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
-import { ShoppingCart, Plus, Minus, Trash2, X, Loader2 } from "lucide-react"
+import { ShoppingCart, Plus, Minus, Trash2, X } from "lucide-react"
 import { useState } from "react"
 import { cn } from "@/lib/utils"
 import { CheckoutModal } from "./checkout-modal"
 
-interface CartSidebarProps {
-  userData: { name: string; phone: string; address: string } | null
-}
-
-export function CartSidebar({ userData }: CartSidebarProps) {
+export function CartSidebar() {
   const { items, removeItem, updateQuantity, clearCart, getTotalItems, getTotalPrice, isOpen, setIsOpen } = useCart()
-  const [isProcessing, setIsProcessing] = useState(false)
   const [showCheckoutModal, setShowCheckoutModal] = useState(false)
-
-  const handleWhatsAppCheckout = async () => {
-    if (items.length === 0) return
-
-    setIsProcessing(true)
-
-    try {
-      let customerInfo = ""
-      let addressText = ""
-
-      if (userData) {
-        customerInfo = `*Cliente:* ${userData.name}\n*Telefone:* ${userData.phone}\n`
-        addressText = userData.address
-      } else {
-        addressText = "Endereço a combinar"
-      }
-
-      const itemsList = items
-        .map(
-          (item) =>
-            `• ${item.name} ${item.size ? `(${item.size})` : ""} - Qtd: ${item.quantity} - R$ ${(item.price * item.quantity).toFixed(2)}`,
-        )
-        .join("\n")
-
-      const total = getTotalPrice()
-
-      const message = `🛒 *PEDIDO DO CARRINHO*
-
-${customerInfo}*Itens do Pedido:*
-${itemsList}
-
-*Total: R$ ${total.toFixed(2)}*
-
-*Endereço de entrega:* ${addressText}
-
-📱 *Pedido realizado pelo site*
-Gostaria de confirmar este pedido! 🙏`
-
-      const whatsappUrl = `https://wa.me/5599984680391?text=${encodeURIComponent(message)}`
-
-      // Abrir WhatsApp em nova aba
-      const newWindow = window.open(whatsappUrl, "_blank")
-
-      // Esperar um pouco antes de limpar o carrinho para garantir que o WhatsApp abriu
-      setTimeout(() => {
-        clearCart()
-        setIsOpen(false)
-        setIsProcessing(false)
-      }, 1000)
-    } catch (error) {
-      console.error("Erro ao processar pedido:", error)
-      setIsProcessing(false)
-    }
-  }
 
   const handleQuantityChange = (id: string, newQuantity: number) => {
     if (newQuantity <= 0) {
@@ -210,61 +151,25 @@ Gostaria de confirmar este pedido! 🙏`
                       <span className="font-semibold">Total:</span>
                       <span className="font-bold text-primary">R$ {getTotalPrice().toFixed(2)}</span>
                     </div>
-
-                    {userData && (
-                      <div className="text-xs text-muted-foreground">
-                        Entrega para: {userData.name} • {userData.address}
-                      </div>
-                    )}
                   </div>
 
                   <div className="space-y-2">
                     <Button
                       onClick={() => setShowCheckoutModal(true)}
-                      disabled={isProcessing}
                       className={cn(
                         "w-full py-3 rounded-xl font-bold transition-all duration-300",
                         "bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800",
                         "text-white shadow-lg hover:shadow-xl",
                       )}
                     >
-                      Finalizar Pedido pelo Site
-                    </Button>
-
-                    <Button
-                      onClick={handleWhatsAppCheckout}
-                      disabled={isProcessing}
-                      className={cn(
-                        "w-full py-3 rounded-xl font-bold transition-all duration-300",
-                        "bg-gradient-to-r from-blue-600 to-black hover:from-blue-700 hover:to-gray-900",
-                        "text-white shadow-lg hover:shadow-xl",
-                      )}
-                    >
-                      {isProcessing ? (
-                        <>
-                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                          Processando...
-                        </>
-                      ) : (
-                        "Finalizar pelo WhatsApp"
-                      )}
+                      Finalizar Pedido
                     </Button>
 
                     <div className="flex gap-2">
-                      <Button
-                        onClick={clearCart}
-                        variant="outline"
-                        className="flex-1 bg-transparent"
-                        disabled={isProcessing}
-                      >
+                      <Button onClick={clearCart} variant="outline" className="flex-1 bg-transparent">
                         Limpar Carrinho
                       </Button>
-                      <Button
-                        onClick={() => setIsOpen(false)}
-                        variant="outline"
-                        className="flex-1"
-                        disabled={isProcessing}
-                      >
+                      <Button onClick={() => setIsOpen(false)} variant="outline" className="flex-1">
                         <X className="h-4 w-4 mr-1" />
                         Fechar
                       </Button>
@@ -290,7 +195,7 @@ Gostaria de confirmar este pedido! 🙏`
       </Sheet>
 
       {/* Modal de checkout */}
-      <CheckoutModal isOpen={showCheckoutModal} onClose={() => setShowCheckoutModal(false)} userData={userData} />
+      <CheckoutModal isOpen={showCheckoutModal} onClose={() => setShowCheckoutModal(false)} />
     </>
   )
 }

@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -12,14 +12,13 @@ import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { X, ShoppingCart, User, Loader2 } from "lucide-react"
 import { useCart } from "./cart-provider"
-import { collection, addDoc } from "firebase/firestore"
+import { collection, addDoc, query, where, getDocs, updateDoc, doc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { toast } from "@/hooks/use-toast"
 
 interface CheckoutModalProps {
   isOpen: boolean
   onClose: () => void
-  userData: { name: string; phone: string; address: string } | null
 }
 
 interface CustomerData {
@@ -30,16 +29,32 @@ interface CustomerData {
   notes: string
 }
 
-export function CheckoutModal({ isOpen, onClose, userData }: CheckoutModalProps) {
+export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
   const { items, getTotalPrice, clearCart } = useCart()
   const [isProcessing, setIsProcessing] = useState(false)
   const [customerData, setCustomerData] = useState<CustomerData>({
-    name: userData?.name || "",
-    phone: userData?.phone || "",
+    name: "",
+    phone: "",
     email: "",
-    address: userData?.address || "",
+    address: "",
     notes: "",
   })
+
+  useEffect(() => {
+    if (isOpen) {
+      const savedData = localStorage.getItem("lastCustomerData")
+      if (savedData) {
+        const parsed = JSON.parse(savedData)
+        setCustomerData((prev) => ({
+          ...prev,
+          name: parsed.name || "",
+          phone: parsed.phone || "",
+          email: parsed.email || "",
+          address: parsed.address || "",
+        }))
+      }
+    }
+  }, [isOpen])
 
   if (!isOpen) return null
 
@@ -94,21 +109,51 @@ export function CheckoutModal({ isOpen, onClose, userData }: CheckoutModalProps)
 
       const docRef = await addDoc(collection(db, "orders"), orderData)
 
-      // Criar/atualizar cliente no Firestore
-      const customerDoc = {
-        name: customerData.name,
-        phone: customerData.phone,
-        email: customerData.email,
-        address: customerData.address,
-        lastOrderId: docRef.id,
-        lastOrderDate: new Date(),
-        totalOrders: 1,
-        totalSpent: getTotalPrice(),
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      }
+      let customerDocId = null
 
-      await addDoc(collection(db, "customers"), customerDoc)
+      // Buscar cliente existente por email ou telefone
+      const customerQuery = query(
+        collection(db, "customers"),
+        where("email", "==", customerData.email || ""),
+        where("phone", "==", customerData.phone),
+      )
+
+      const existingCustomers = await getDocs(customerQuery)
+
+      if (!existingCustomers.empty) {
+        // Cliente existe - atualizar dados
+        const existingCustomer = existingCustomers.docs[0]
+        customerDocId = existingCustomer.id
+        const currentData = existingCustomer.data()
+
+        await updateDoc(doc(db, "customers", customerDocId), {
+          name: customerData.name,
+          email: customerData.email,
+          address: customerData.address,
+          lastOrderId: docRef.id,
+          lastOrderDate: new Date(),
+          totalOrders: (currentData.totalOrders || 0) + 1,
+          totalSpent: (currentData.totalSpent || 0) + getTotalPrice(),
+          updatedAt: new Date(),
+        })
+      } else {
+        // Cliente novo - criar
+        const customerDoc = {
+          name: customerData.name,
+          phone: customerData.phone,
+          email: customerData.email,
+          address: customerData.address,
+          lastOrderId: docRef.id,
+          lastOrderDate: new Date(),
+          totalOrders: 1,
+          totalSpent: getTotalPrice(),
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        }
+
+        const newCustomerRef = await addDoc(collection(db, "customers"), customerDoc)
+        customerDocId = newCustomerRef.id
+      }
 
       // Limpar carrinho e fechar modal
       clearCart()
@@ -119,12 +164,12 @@ export function CheckoutModal({ isOpen, onClose, userData }: CheckoutModalProps)
         description: `Seu pedido #${docRef.id.slice(-6)} foi registrado. Você receberá atualizações em breve.`,
       })
 
-      // Salvar dados do usuário no localStorage
       localStorage.setItem(
-        "userData",
+        "lastCustomerData",
         JSON.stringify({
           name: customerData.name,
           phone: customerData.phone,
+          email: customerData.email,
           address: customerData.address,
         }),
       )
@@ -218,14 +263,16 @@ Gostaria de confirmar este pedido! 🙏`
                 </div>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="email">Email (opcional)</Label>
+                <Label htmlFor="email">Email *</Label>
                 <Input
                   id="email"
                   type="email"
                   value={customerData.email}
                   onChange={(e) => setCustomerData({ ...customerData, email: e.target.value })}
                   placeholder="seu@email.com"
+                  required
                 />
+                <p className="text-xs text-muted-foreground">Necessário para acompanhar seus pedidos</p>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="address">Endereço de Entrega *</Label>
@@ -307,7 +354,7 @@ Gostaria de confirmar este pedido! 🙏`
             <Button
               type="button"
               onClick={handleWhatsAppCheckout}
-              disabled={isProcessing}
+              disabled={isProcessing || !customerData.name || !customerData.phone || !customerData.address}
               className="w-full py-3 text-lg font-bold bg-gradient-to-r from-blue-600 to-black hover:from-blue-700 hover:to-gray-900"
             >
               Finalizar pelo WhatsApp

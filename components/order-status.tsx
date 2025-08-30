@@ -7,8 +7,8 @@ import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
-import { Package, Truck, CheckCircle, Clock, Search, Phone } from "lucide-react"
-import { collection, query, where, onSnapshot, orderBy } from "firebase/firestore"
+import { Package, Truck, CheckCircle, Clock, Search, Phone, Mail } from "lucide-react"
+import { collection, query, where, onSnapshot, orderBy, and } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 
 interface Order {
@@ -39,17 +39,21 @@ interface Order {
 export function OrderStatus() {
   const [orders, setOrders] = useState<Order[]>([])
   const [searchPhone, setSearchPhone] = useState("")
+  const [searchEmail, setSearchEmail] = useState("")
   const [isLoading, setIsLoading] = useState(false)
 
   const searchOrders = async () => {
-    if (!searchPhone.trim()) return
+    if (!searchPhone.trim() || !searchEmail.trim()) return
 
     setIsLoading(true)
 
     try {
       const q = query(
         collection(db, "orders"),
-        where("customerInfo.phone", "==", searchPhone.trim()),
+        and(
+          where("customerInfo.phone", "==", searchPhone.trim()),
+          where("customerInfo.email", "==", searchEmail.trim().toLowerCase()),
+        ),
         orderBy("createdAt", "desc"),
       )
 
@@ -106,39 +110,67 @@ export function OrderStatus() {
     <div className="container mx-auto px-4 py-8 max-w-4xl">
       <div className="text-center mb-8">
         <h1 className="text-3xl font-bold mb-2">Acompanhar Pedido</h1>
-        <p className="text-muted-foreground">Digite seu telefone para ver o status dos seus pedidos</p>
+        <p className="text-muted-foreground">Digite seu email E telefone para ver o status dos seus pedidos</p>
       </div>
 
-      {/* Busca por telefone */}
+      {/* Busca por email e telefone */}
       <Card className="mb-8">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Phone className="h-5 w-5" />
+            <Search className="h-5 w-5" />
             Buscar Pedidos
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex gap-4">
-            <div className="flex-1">
-              <Label htmlFor="phone">Telefone</Label>
-              <Input
-                id="phone"
-                value={searchPhone}
-                onChange={(e) => setSearchPhone(e.target.value)}
-                placeholder="(99) 99999-9999"
-                className="mt-1"
-              />
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="email" className="flex items-center gap-2">
+                  <Mail className="h-4 w-4" />
+                  Email *
+                </Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={searchEmail}
+                  onChange={(e) => setSearchEmail(e.target.value)}
+                  placeholder="seu@email.com"
+                  className="mt-1"
+                  required
+                />
+              </div>
+              <div>
+                <Label htmlFor="phone" className="flex items-center gap-2">
+                  <Phone className="h-4 w-4" />
+                  Telefone *
+                </Label>
+                <Input
+                  id="phone"
+                  value={searchPhone}
+                  onChange={(e) => setSearchPhone(e.target.value)}
+                  placeholder="(99) 99999-9999"
+                  className="mt-1"
+                  required
+                />
+              </div>
             </div>
-            <div className="flex items-end">
-              <Button onClick={searchOrders} disabled={isLoading} className="flex items-center gap-2">
+            <div className="flex justify-center">
+              <Button
+                onClick={searchOrders}
+                disabled={isLoading || !searchEmail.trim() || !searchPhone.trim()}
+                className="flex items-center gap-2 px-8"
+              >
                 {isLoading ? (
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
                 ) : (
                   <Search className="h-4 w-4" />
                 )}
-                Buscar
+                Buscar Pedidos
               </Button>
             </div>
+            <p className="text-xs text-center text-muted-foreground">
+              * Ambos os campos são obrigatórios para buscar seus pedidos
+            </p>
           </div>
         </CardContent>
       </Card>
@@ -236,13 +268,13 @@ export function OrderStatus() {
             )
           })}
         </div>
-      ) : searchPhone && !isLoading ? (
+      ) : searchPhone && searchEmail && !isLoading ? (
         <Card>
           <CardContent className="text-center py-8">
             <Package className="h-16 w-16 mx-auto mb-4 text-gray-400" />
             <h3 className="text-lg font-semibold mb-2">Nenhum pedido encontrado</h3>
             <p className="text-muted-foreground">
-              Não encontramos pedidos para este telefone. Verifique se digitou corretamente.
+              Não encontramos pedidos para estes dados. Verifique se digitou corretamente.
             </p>
           </CardContent>
         </Card>

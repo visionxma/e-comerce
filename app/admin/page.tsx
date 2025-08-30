@@ -37,6 +37,7 @@ import {
   MessageSquare,
   Clock,
   Truck,
+  Calendar,
 } from "lucide-react"
 import { signInWithEmailAndPassword, signOut, onAuthStateChanged } from "firebase/auth"
 import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy } from "firebase/firestore"
@@ -99,19 +100,24 @@ interface Order {
 
 export default function AdminPage() {
   const [products, setProducts] = useState<Product[]>([])
-  const [banners, setBanners] = useState<Banner[]>([])
-  const [customers, setCustomers] = useState<Customer[]>([])
   const [orders, setOrders] = useState<Order[]>([])
-  const [editingProduct, setEditingProduct] = useState<Product | null>(null)
-  const [editingBanner, setEditingBanner] = useState<Banner | null>(null)
+  const [customers, setCustomers] = useState<Customer[]>([])
+  const [banners, setBanners] = useState<Banner[]>([])
+  const [searchTerm, setSearchTerm] = useState("")
+  const [selectedCategory, setSelectedCategory] = useState("all")
   const [isAddingNew, setIsAddingNew] = useState(false)
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+
+  const [orderSearchTerm, setOrderSearchTerm] = useState("")
+  const [selectedOrderStatus, setSelectedOrderStatus] = useState("all")
+  const [selectedDateRange, setSelectedDateRange] = useState("all")
+
+  const [editingBanner, setEditingBanner] = useState<Banner | null>(null)
   const [isAddingBanner, setIsAddingBanner] = useState(false)
   const [activeTab, setActiveTab] = useState("products")
   const [isAuthenticated, setIsAuthenticated] = useState(false)
-  const [isLoading, setIsLoading] = useState(true)
   const [loginData, setLoginData] = useState({ email: "", password: "" })
-  const [searchTerm, setSearchTerm] = useState("")
-  const [selectedCategory, setSelectedCategory] = useState("all")
   const [loginError, setLoginError] = useState("")
   const [uploadingImages, setUploadingImages] = useState<boolean[]>([])
 
@@ -157,6 +163,38 @@ export default function AdminPage() {
       product.description.toLowerCase().includes(searchTerm.toLowerCase())
     const matchesCategory = selectedCategory === "all" || product.category === selectedCategory
     return matchesSearch && matchesCategory
+  })
+
+  const filteredOrders = orders.filter((order) => {
+    const matchesSearch =
+      order.customerInfo.name.toLowerCase().includes(orderSearchTerm.toLowerCase()) ||
+      order.customerInfo.phone.includes(orderSearchTerm) ||
+      order.customerInfo.email?.toLowerCase().includes(orderSearchTerm.toLowerCase()) ||
+      order.id.toLowerCase().includes(orderSearchTerm.toLowerCase())
+
+    const matchesStatus = selectedOrderStatus === "all" || order.status === selectedOrderStatus
+
+    let matchesDate = true
+    if (selectedDateRange !== "all") {
+      const orderDate = order.createdAt
+      const now = new Date()
+
+      switch (selectedDateRange) {
+        case "today":
+          matchesDate = orderDate.toDateString() === now.toDateString()
+          break
+        case "week":
+          const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+          matchesDate = orderDate >= weekAgo
+          break
+        case "month":
+          const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+          matchesDate = orderDate >= monthAgo
+          break
+      }
+    }
+
+    return matchesSearch && matchesStatus && matchesDate
   })
 
   useEffect(() => {
@@ -1492,102 +1530,133 @@ Status atual: ${getStatusInfo(order.status).label}`
               <h2 className="text-2xl font-semibold">Gerenciar Pedidos</h2>
             </div>
 
-            {orders.length === 0 ? (
+            <Card>
+              <CardContent className="pt-6">
+                <div className="flex flex-col lg:flex-row gap-4">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Buscar por nome, telefone, email ou ID do pedido..."
+                      value={orderSearchTerm}
+                      onChange={(e) => setOrderSearchTerm(e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <Select value={selectedOrderStatus} onValueChange={setSelectedOrderStatus}>
+                      <SelectTrigger className="w-[180px]">
+                        <Filter className="w-4 h-4 mr-2" />
+                        <SelectValue placeholder="Status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos os status</SelectItem>
+                        <SelectItem value="pending">Aguardando</SelectItem>
+                        <SelectItem value="confirmed">Confirmado</SelectItem>
+                        <SelectItem value="shipped">Saiu para Entrega</SelectItem>
+                        <SelectItem value="delivered">Entregue</SelectItem>
+                        <SelectItem value="cancelled">Cancelado</SelectItem>
+                      </SelectContent>
+                    </Select>
+
+                    <Select value={selectedDateRange} onValueChange={setSelectedDateRange}>
+                      <SelectTrigger className="w-[180px]">
+                        <Calendar className="w-4 h-4 mr-2" />
+                        <SelectValue placeholder="Período" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos os períodos</SelectItem>
+                        <SelectItem value="today">Hoje</SelectItem>
+                        <SelectItem value="week">Última semana</SelectItem>
+                        <SelectItem value="month">Último mês</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="mt-4 text-sm text-muted-foreground">
+                  Mostrando {filteredOrders.length} de {orders.length} pedidos
+                </div>
+              </CardContent>
+            </Card>
+
+            {filteredOrders.length === 0 ? (
               <Card>
                 <CardContent className="p-8 text-center">
                   <ShoppingCart className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
-                  <h3 className="text-xl font-semibold mb-2">Nenhum pedido realizado</h3>
+                  <h3 className="text-xl font-semibold mb-2">
+                    {orders.length === 0 ? "Nenhum pedido realizado" : "Nenhum pedido encontrado"}
+                  </h3>
                   <p className="text-muted-foreground">
-                    Os pedidos aparecerão aqui quando os clientes finalizarem compras pelo site.
+                    {orders.length === 0
+                      ? "Os pedidos aparecerão aqui quando os clientes finalizarem compras pelo site."
+                      : "Tente ajustar os filtros para encontrar os pedidos desejados."}
                   </p>
                 </CardContent>
               </Card>
             ) : (
-              <div className="space-y-4">
-                {orders.map((order) => {
+              <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
+                {filteredOrders.map((order) => {
                   const statusInfo = getStatusInfo(order.status)
                   const StatusIcon = statusInfo.icon
 
                   return (
-                    <Card key={order.id}>
-                      <CardHeader>
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <CardTitle className="text-lg">Pedido #{order.id.slice(-6)}</CardTitle>
-                            <CardDescription>
-                              {formatDate(order.createdAt)} • {order.customerInfo.name}
-                            </CardDescription>
+                    <Card key={order.id} className="h-fit">
+                      <CardHeader className="pb-3">
+                        <div className="flex items-start justify-between">
+                          <div className="min-w-0 flex-1">
+                            <CardTitle className="text-base truncate">Pedido #{order.id.slice(-6)}</CardTitle>
+                            <CardDescription className="text-xs">{formatDate(order.createdAt)}</CardDescription>
+                            <p className="text-sm font-medium mt-1 truncate">{order.customerInfo.name}</p>
                           </div>
-                          <Badge className={statusInfo.color}>
-                            <StatusIcon className="h-4 w-4 mr-1" />
+                          <Badge className={`${statusInfo.color} text-xs shrink-0 ml-2`}>
+                            <StatusIcon className="h-3 w-3 mr-1" />
                             {statusInfo.label}
                           </Badge>
                         </div>
                       </CardHeader>
-                      <CardContent className="space-y-4">
-                        {/* Informações do cliente */}
-                        <div className="bg-gray-50 p-4 rounded-lg">
-                          <h4 className="font-medium mb-2">Dados do Cliente</h4>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
-                            <p>
-                              <strong>Nome:</strong> {order.customerInfo.name}
-                            </p>
-                            <p>
-                              <strong>Telefone:</strong> {order.customerInfo.phone}
-                            </p>
-                            {order.customerInfo.email && (
-                              <p>
-                                <strong>Email:</strong> {order.customerInfo.email}
-                              </p>
-                            )}
-                            <p className="md:col-span-2">
-                              <strong>Endereço:</strong> {order.customerInfo.address}
-                            </p>
+                      <CardContent className="space-y-3 pt-0">
+                        <div className="bg-gray-50 p-3 rounded-lg">
+                          <h4 className="font-medium text-sm mb-2">Cliente</h4>
+                          <div className="space-y-1 text-xs">
+                            <p className="truncate">📞 {order.customerInfo.phone}</p>
+                            {order.customerInfo.email && <p className="truncate">✉️ {order.customerInfo.email}</p>}
+                            <p className="truncate">📍 {order.customerInfo.address}</p>
                           </div>
                         </div>
 
-                        {/* Itens do pedido */}
                         <div>
-                          <h4 className="font-medium mb-3">Itens do Pedido</h4>
-                          <div className="space-y-2">
+                          <h4 className="font-medium text-sm mb-2">Itens ({order.items.length})</h4>
+                          <div className="space-y-1 max-h-32 overflow-y-auto">
                             {order.items.map((item, index) => (
-                              <div key={index} className="flex items-center gap-3 p-2 border rounded">
+                              <div key={index} className="flex items-center gap-2 p-2 border rounded text-xs">
                                 <img
                                   src={item.imageUrl || "/placeholder.svg"}
                                   alt={item.productName}
-                                  className="w-10 h-10 object-cover rounded"
+                                  className="w-8 h-8 object-cover rounded"
                                 />
-                                <div className="flex-1">
-                                  <p className="font-medium text-sm">{item.productName}</p>
-                                  <p className="text-xs text-gray-600">
-                                    {item.category} {item.size && `• ${item.size}`} {item.brand && `• ${item.brand}`}
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-medium truncate">{item.productName}</p>
+                                  <p className="text-gray-600 truncate">
+                                    {item.quantity}x • R$ {(item.price * item.quantity).toFixed(2)}
                                   </p>
-                                </div>
-                                <div className="text-right text-sm">
-                                  <p>Qtd: {item.quantity}</p>
-                                  <p className="font-bold">R$ {(item.price * item.quantity).toFixed(2)}</p>
                                 </div>
                               </div>
                             ))}
                           </div>
                         </div>
 
-                        {/* Total e observações */}
-                        <div className="flex justify-between items-center pt-2 border-t">
-                          <div>
-                            {order.notes && (
-                              <p className="text-sm text-gray-600">
-                                <strong>Obs:</strong> {order.notes}
-                              </p>
-                            )}
-                          </div>
-                          <p className="text-lg font-bold text-primary">Total: R$ {order.total.toFixed(2)}</p>
+                        <div className="pt-2 border-t">
+                          {order.notes && (
+                            <p className="text-xs text-gray-600 mb-2 truncate">
+                              <strong>Obs:</strong> {order.notes}
+                            </p>
+                          )}
+                          <p className="text-base font-bold text-primary">Total: R$ {order.total.toFixed(2)}</p>
                         </div>
 
-                        {/* Ações */}
-                        <div className="flex flex-wrap gap-2 pt-2">
+                        <div className="flex flex-col gap-2 pt-2">
                           <Select value={order.status} onValueChange={(value) => updateOrderStatus(order.id, value)}>
-                            <SelectTrigger className="w-[200px]">
+                            <SelectTrigger className="h-8 text-xs">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -1602,9 +1671,9 @@ Status atual: ${getStatusInfo(order.status).label}`
                           <Button
                             size="sm"
                             onClick={() => window.open(generateWhatsAppMessage(order), "_blank")}
-                            className="flex items-center gap-2"
+                            className="flex items-center gap-2 h-8 text-xs"
                           >
-                            <MessageSquare className="w-4 h-4" />
+                            <MessageSquare className="w-3 h-3" />
                             WhatsApp
                           </Button>
                         </div>

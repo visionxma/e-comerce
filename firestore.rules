@@ -43,18 +43,19 @@ service cloud.firestore {
       // Permitir leitura apenas para administradores
       allow read: if request.auth != null;
       
-      // Permitir escrita para todos (para criar clientes) e administradores (para editar)
       allow create: if validateCustomerData(request.resource.data);
       allow update: if request.auth != null && validateCustomerData(request.resource.data);
       allow delete: if request.auth != null;
     }
     
     match /orders/{orderId} {
-      // Permitir leitura apenas para administradores
-      allow read: if request.auth != null;
+      // Permitir leitura para todos (necessário para busca de pedidos por email/telefone)
+      allow read: if true;
       
-      // Permitir criação para todos (para fazer pedidos) e edição apenas para administradores
+      // Permitir criação de pedidos sem autenticação (checkout público)
       allow create: if validateOrderData(request.resource.data);
+      
+      // Apenas administradores podem atualizar e deletar pedidos
       allow update: if request.auth != null && validateOrderData(request.resource.data);
       allow delete: if request.auth != null;
     }
@@ -100,11 +101,14 @@ service cloud.firestore {
     }
     
     function validateCustomerData(data) {
-      return data.keys().hasAll(['name', 'phone', 'address', 'totalOrders', 'totalSpent', 'createdAt', 'updatedAt']) &&
+      return data.keys().hasAll(['name', 'phone', 'email', 'address', 'totalOrders', 'totalSpent', 'createdAt', 'updatedAt']) &&
              data.name is string &&
              data.name.size() > 0 &&
              data.phone is string &&
              data.phone.size() > 0 &&
+             data.email is string &&
+             data.email.size() > 0 &&
+             data.email.matches('.*@.*\\..*') && // Validação básica de email
              data.address is string &&
              data.address.size() > 0 &&
              data.totalOrders is number &&
@@ -113,7 +117,6 @@ service cloud.firestore {
              data.totalSpent >= 0 &&
              data.createdAt is timestamp &&
              data.updatedAt is timestamp &&
-             (!data.keys().hasAny(['email']) || data.email is string) &&
              (!data.keys().hasAny(['lastOrderId']) || data.lastOrderId is string) &&
              (!data.keys().hasAny(['lastOrderDate']) || data.lastOrderDate is timestamp);
     }
@@ -121,14 +124,16 @@ service cloud.firestore {
     function validateOrderData(data) {
       return data.keys().hasAll(['customerInfo', 'items', 'total', 'status', 'createdAt', 'updatedAt']) &&
              data.customerInfo is map &&
-             data.customerInfo.keys().hasAll(['name', 'phone', 'address']) &&
+             data.customerInfo.keys().hasAll(['name', 'phone', 'email', 'address']) &&
              data.customerInfo.name is string &&
              data.customerInfo.name.size() > 0 &&
              data.customerInfo.phone is string &&
              data.customerInfo.phone.size() > 0 &&
+             data.customerInfo.email is string &&
+             data.customerInfo.email.size() > 0 &&
+             data.customerInfo.email.matches('.*@.*\\..*') && // Validação básica de email
              data.customerInfo.address is string &&
              data.customerInfo.address.size() > 0 &&
-             (!data.customerInfo.keys().hasAny(['email']) || data.customerInfo.email is string) &&
              data.items is list &&
              data.items.size() > 0 &&
              data.total is number &&

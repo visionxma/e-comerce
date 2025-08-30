@@ -10,10 +10,9 @@ interface ProductModalProps {
   isOpen: boolean
   onClose: () => void
   product: Product | null
-  userData: { name: string; phone: string; address: string } | null
 }
 
-export function ProductModal({ isOpen, onClose, product, userData }: ProductModalProps) {
+export function ProductModal({ isOpen, onClose, product }: ProductModalProps) {
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
   const [showCheckoutModal, setShowCheckoutModal] = useState(false)
 
@@ -30,25 +29,13 @@ export function ProductModal({ isOpen, onClose, product, userData }: ProductModa
   }
 
   const handleBuyNow = () => {
-    let customerInfo = ""
-    let addressText = ""
-
-    if (userData) {
-      customerInfo = `*Cliente:* ${userData.name}\n*Telefone:* ${userData.phone}\n`
-      addressText = userData.address
-    } else {
-      addressText = "Endereço a combinar"
-    }
-
     const message = `🛒 *INTERESSE EM PRODUTO*
 
-${customerInfo}*Produto:* ${product.name}
+*Produto:* ${product.name}
 *Preço:* R$ ${product.price.toFixed(2)}
 *Categoria:* ${product.category}
 ${product.size ? `*Tamanho:* ${product.size}\n` : ""}${product.brand ? `*Marca:* ${product.brand}\n` : ""}
 *Descrição:* ${product.description}
-
-*Endereço de entrega:* ${addressText}
 
 📱 *Interesse demonstrado pelo site*
 Gostaria de mais informações sobre este produto! 🙏`
@@ -223,7 +210,7 @@ Gostaria de mais informações sobre este produto! 🙏`
       </div>
 
       {/* Modal de checkout */}
-      <CheckoutModal isOpen={showCheckoutModal} onClose={() => setShowCheckoutModal(false)} userData={userData} />
+      <CheckoutModal isOpen={showCheckoutModal} onClose={() => setShowCheckoutModal(false)} />
     </>
   )
 }

@@ -2,14 +2,13 @@
 
 import { useState, useEffect } from "react"
 import { CartProvider } from "@/components/cart-provider"
-import { CartSidebar } from "@/components/cart-sidebar" // Importe novamente
+import { CartSidebar } from "@/components/cart-sidebar"
 import { Toaster } from "@/components/ui/toaster"
 import { ProductCard } from "@/components/product-card"
 import { ProductModal } from "@/components/product-modal"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { Banner } from "@/components/banner"
-import { UserRegistration } from "@/components/user-registration"
 import { collection, onSnapshot, query, orderBy } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 
@@ -30,17 +29,11 @@ export interface Product {
 export default function HomePage() {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
   const [isProductModalOpen, setIsProductModalOpen] = useState(false)
-  const [userData, setUserData] = useState<{ name: string; phone: string; address: string } | null>(null)
   const [products, setProducts] = useState<Product[]>([])
   const [isLoadingProducts, setIsLoadingProducts] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
 
   useEffect(() => {
-    const savedUserData = localStorage.getItem("userData")
-    if (savedUserData) {
-      setUserData(JSON.parse(savedUserData))
-    }
-
     const q = query(collection(db, "products"), orderBy("name"))
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const productsData: Product[] = []
@@ -62,16 +55,6 @@ export default function HomePage() {
   const handleProductSelect = (product: Product) => {
     setSelectedProduct(product)
     setIsProductModalOpen(true)
-  }
-
-  const handleUserRegistration = (data: { name: string; phone: string; address: string }) => {
-    localStorage.setItem("userData", JSON.stringify(data))
-    setUserData(data)
-  }
-
-  const handleClearUserData = () => {
-    localStorage.removeItem("userData")
-    setUserData(null)
   }
 
   // Filtrar produtos baseado no termo de pesquisa
@@ -114,24 +97,6 @@ export default function HomePage() {
 
           {/* Banners Promocionais */}
           <Banner />
-
-          {/* User Registration/Greeting Section */}
-          {userData ? (
-            <div className="bg-card border rounded-lg p-3 mb-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-base font-semibold text-foreground">Olá, {userData.name}! 👋</h2>
-                  <p className="text-xs text-muted-foreground">{userData.phone}</p>
-                  <p className="text-xs text-muted-foreground">{userData.address}</p>
-                </div>
-                <button onClick={handleClearUserData} className="text-xs text-muted-foreground hover:text-foreground">
-                  Alterar
-                </button>
-              </div>
-            </div>
-          ) : (
-            <UserRegistration onRegister={handleUserRegistration} />
-          )}
 
           {/* Search Bar */}
           {!isLoadingProducts && products.length > 0 && (
@@ -309,12 +274,11 @@ export default function HomePage() {
           isOpen={isProductModalOpen}
           onClose={() => setIsProductModalOpen(false)}
           product={selectedProduct}
-          userData={userData}
         />
 
         {/* Carrinho Sidebar Flutuante */}
         <div className="fixed bottom-4 right-4 z-50">
-          <CartSidebar userData={userData} />
+          <CartSidebar />
         </div>
 
         {/* Toast notifications */}
