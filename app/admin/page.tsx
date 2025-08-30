@@ -255,7 +255,7 @@ export default function AdminPage() {
     }
   }
 
-  const handleDeleteProduct = async (id: string) {
+  const handleDeleteProduct = async (id: string) => {
     if (confirm("Tem certeza que deseja excluir este produto? Esta ação não pode ser desfeita.")) {
       try {
         await deleteDoc(doc(db, "products", id))
@@ -265,6 +265,7 @@ export default function AdminPage() {
       }
     }
   }
+
 
   const handleDeleteBanner = async (id: string) => {
     if (confirm("Tem certeza que deseja excluir este banner? Esta ação não pode ser desfeita.")) {
