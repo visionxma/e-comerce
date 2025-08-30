@@ -56,7 +56,7 @@ export default function AdminPage() {
   const [loginError, setLoginError] = useState("")
   const [uploadingImages, setUploadingImages] = useState<boolean[]>([])
   
-  const [newProduct, setNewProduct] = useState<Omit<Product, "id">>({
+    const [newProduct, setNewProduct] = useState<Omit<Product, "id">>({
     name: "",
     description: "",
     price: 0,
