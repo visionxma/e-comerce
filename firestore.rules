@@ -39,6 +39,26 @@ service cloud.firestore {
       allow delete: if request.auth != null;
     }
     
+    match /customers/{customerId} {
+      // Permitir leitura apenas para administradores
+      allow read: if request.auth != null;
+      
+      // Permitir escrita para todos (para criar clientes) e administradores (para editar)
+      allow create: if validateCustomerData(request.resource.data);
+      allow update: if request.auth != null && validateCustomerData(request.resource.data);
+      allow delete: if request.auth != null;
+    }
+    
+    match /orders/{orderId} {
+      // Permitir leitura apenas para administradores
+      allow read: if request.auth != null;
+      
+      // Permitir criação para todos (para fazer pedidos) e edição apenas para administradores
+      allow create: if validateOrderData(request.resource.data);
+      allow update: if request.auth != null && validateOrderData(request.resource.data);
+      allow delete: if request.auth != null;
+    }
+    
     // Função para validar dados do produto
     function validateProductData(data) {
       return data.keys().hasAll(['name', 'price', 'category', 'images']) &&
@@ -77,6 +97,47 @@ service cloud.firestore {
              (!data.keys().hasAny(['backgroundColor']) || data.backgroundColor is string) &&
              (!data.keys().hasAny(['textColor']) || data.textColor is string) &&
              (!data.keys().hasAny(['createdAt']) || data.createdAt is timestamp);
+    }
+    
+    function validateCustomerData(data) {
+      return data.keys().hasAll(['name', 'phone', 'address', 'totalOrders', 'totalSpent', 'createdAt', 'updatedAt']) &&
+             data.name is string &&
+             data.name.size() > 0 &&
+             data.phone is string &&
+             data.phone.size() > 0 &&
+             data.address is string &&
+             data.address.size() > 0 &&
+             data.totalOrders is number &&
+             data.totalOrders >= 0 &&
+             data.totalSpent is number &&
+             data.totalSpent >= 0 &&
+             data.createdAt is timestamp &&
+             data.updatedAt is timestamp &&
+             (!data.keys().hasAny(['email']) || data.email is string) &&
+             (!data.keys().hasAny(['lastOrderId']) || data.lastOrderId is string) &&
+             (!data.keys().hasAny(['lastOrderDate']) || data.lastOrderDate is timestamp);
+    }
+    
+    function validateOrderData(data) {
+      return data.keys().hasAll(['customerInfo', 'items', 'total', 'status', 'createdAt', 'updatedAt']) &&
+             data.customerInfo is map &&
+             data.customerInfo.keys().hasAll(['name', 'phone', 'address']) &&
+             data.customerInfo.name is string &&
+             data.customerInfo.name.size() > 0 &&
+             data.customerInfo.phone is string &&
+             data.customerInfo.phone.size() > 0 &&
+             data.customerInfo.address is string &&
+             data.customerInfo.address.size() > 0 &&
+             (!data.customerInfo.keys().hasAny(['email']) || data.customerInfo.email is string) &&
+             data.items is list &&
+             data.items.size() > 0 &&
+             data.total is number &&
+             data.total > 0 &&
+             data.status is string &&
+             data.status in ['pending', 'confirmed', 'shipped', 'delivered', 'cancelled'] &&
+             data.createdAt is timestamp &&
+             data.updatedAt is timestamp &&
+             (!data.keys().hasAny(['notes']) || data.notes is string);
     }
   }
 }

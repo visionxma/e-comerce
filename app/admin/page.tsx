@@ -15,10 +15,28 @@ import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
-import { Skeleton } from "@/components/ui/skeleton"
-import { 
-  Trash2, Edit, Plus, Save, X, LogOut, Image as ImageIcon, Eye, EyeOff, 
-  Upload, Search, Filter, AlertCircle, ShoppingBag, Image, CheckCircle, Package
+import {
+  Trash2,
+  Edit,
+  Plus,
+  Save,
+  X,
+  LogOut,
+  ImageIcon,
+  Eye,
+  EyeOff,
+  Upload,
+  Search,
+  Filter,
+  AlertCircle,
+  ShoppingBag,
+  CheckCircle,
+  Package,
+  Users,
+  ShoppingCart,
+  MessageSquare,
+  Clock,
+  Truck,
 } from "lucide-react"
 import { signInWithEmailAndPassword, signOut, onAuthStateChanged } from "firebase/auth"
 import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy } from "firebase/firestore"
@@ -40,9 +58,50 @@ interface Banner {
   createdAt: Date
 }
 
+interface Customer {
+  id: string
+  name: string
+  phone: string
+  email?: string
+  address: string
+  lastOrderId?: string
+  lastOrderDate?: Date
+  totalOrders: number
+  totalSpent: number
+  createdAt: Date
+  updatedAt: Date
+}
+
+interface Order {
+  id: string
+  customerInfo: {
+    name: string
+    phone: string
+    email?: string
+    address: string
+  }
+  items: Array<{
+    productId: string
+    productName: string
+    price: number
+    quantity: number
+    imageUrl: string
+    category: string
+    size?: string
+    brand?: string
+  }>
+  total: number
+  status: "pending" | "confirmed" | "shipped" | "delivered" | "cancelled"
+  notes?: string
+  createdAt: Date
+  updatedAt: Date
+}
+
 export default function AdminPage() {
   const [products, setProducts] = useState<Product[]>([])
   const [banners, setBanners] = useState<Banner[]>([])
+  const [customers, setCustomers] = useState<Customer[]>([])
+  const [orders, setOrders] = useState<Order[]>([])
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
   const [editingBanner, setEditingBanner] = useState<Banner | null>(null)
   const [isAddingNew, setIsAddingNew] = useState(false)
@@ -55,12 +114,12 @@ export default function AdminPage() {
   const [selectedCategory, setSelectedCategory] = useState("all")
   const [loginError, setLoginError] = useState("")
   const [uploadingImages, setUploadingImages] = useState<boolean[]>([])
-  
+
   // Separar produtos vendidos e não vendidos
-  const availableProducts = products.filter(product => !product.sold)
-  const soldProducts = products.filter(product => product.sold)
-  
-    const [newProduct, setNewProduct] = useState<Omit<Product, "id">>({
+  const availableProducts = products.filter((product) => !product.sold)
+  const soldProducts = products.filter((product) => product.sold)
+
+  const [newProduct, setNewProduct] = useState<Omit<Product, "id">>({
     name: "",
     description: "",
     price: 0,
@@ -70,7 +129,7 @@ export default function AdminPage() {
     brand: "",
     stock: 0,
     featured: false,
-    sold: false
+    sold: false,
   })
 
   const [newBanner, setNewBanner] = useState<Omit<Banner, "id" | "createdAt">>({
@@ -89,12 +148,13 @@ export default function AdminPage() {
   const fileInputRefs = useRef<(HTMLInputElement | null)[]>([])
 
   // Obter categorias únicas dos produtos
-  const categories = ["all", ...new Set(availableProducts.map(product => product.category).filter(Boolean))]
+  const categories = ["all", ...new Set(availableProducts.map((product) => product.category).filter(Boolean))]
 
   // Filtrar produtos
-  const filteredProducts = availableProducts.filter(product => {
-    const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          product.description.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredProducts = availableProducts.filter((product) => {
+    const matchesSearch =
+      product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      product.description.toLowerCase().includes(searchTerm.toLowerCase())
     const matchesCategory = selectedCategory === "all" || product.category === selectedCategory
     return matchesSearch && matchesCategory
   })
@@ -126,18 +186,53 @@ export default function AdminPage() {
         const bannersData: Banner[] = []
         snapshot.forEach((doc) => {
           const data = doc.data()
-          bannersData.push({ 
-            id: doc.id, 
+          bannersData.push({
+            id: doc.id,
             ...data,
-            createdAt: data.createdAt?.toDate() || new Date()
+            createdAt: data.createdAt?.toDate() || new Date(),
           } as Banner)
         })
         setBanners(bannersData)
       })
 
+      // Customers listener
+      const customersQuery = query(collection(db, "customers"), orderBy("createdAt", "desc"))
+      const unsubscribeCustomers = onSnapshot(customersQuery, (snapshot) => {
+        const customersData: Customer[] = []
+        snapshot.forEach((doc) => {
+          const data = doc.data()
+          customersData.push({
+            id: doc.id,
+            ...data,
+            createdAt: data.createdAt?.toDate() || new Date(),
+            updatedAt: data.updatedAt?.toDate() || new Date(),
+            lastOrderDate: data.lastOrderDate?.toDate() || null,
+          } as Customer)
+        })
+        setCustomers(customersData)
+      })
+
+      // Orders listener
+      const ordersQuery = query(collection(db, "orders"), orderBy("createdAt", "desc"))
+      const unsubscribeOrders = onSnapshot(ordersQuery, (snapshot) => {
+        const ordersData: Order[] = []
+        snapshot.forEach((doc) => {
+          const data = doc.data()
+          ordersData.push({
+            id: doc.id,
+            ...data,
+            createdAt: data.createdAt?.toDate() || new Date(),
+            updatedAt: data.updatedAt?.toDate() || new Date(),
+          } as Order)
+        })
+        setOrders(ordersData)
+      })
+
       return () => {
         unsubscribeProducts()
         unsubscribeBanners()
+        unsubscribeCustomers()
+        unsubscribeOrders()
       }
     }
   }, [isAuthenticated])
@@ -166,7 +261,7 @@ export default function AdminPage() {
       alert("Preencha os campos obrigatórios: Nome, Preço, Categoria e pelo menos uma imagem.")
       return
     }
-    
+
     try {
       await addDoc(collection(db, "products"), newProduct)
       setNewProduct({
@@ -179,7 +274,7 @@ export default function AdminPage() {
         brand: "",
         stock: 0,
         featured: false,
-        sold: false
+        sold: false,
       })
       setIsAddingNew(false)
     } catch (error) {
@@ -193,11 +288,11 @@ export default function AdminPage() {
       alert("Preencha os campos obrigatórios: Título e Imagem.")
       return
     }
-    
+
     try {
       await addDoc(collection(db, "banners"), {
         ...newBanner,
-        createdAt: new Date()
+        createdAt: new Date(),
       })
       setNewBanner({
         title: "",
@@ -231,7 +326,7 @@ export default function AdminPage() {
         brand: product.brand,
         stock: product.stock,
         featured: product.featured,
-        sold: product.sold
+        sold: product.sold,
       })
       setEditingProduct(null)
     } catch (error) {
@@ -277,7 +372,7 @@ export default function AdminPage() {
     try {
       const productRef = doc(db, "products", productId)
       await updateDoc(productRef, { sold })
-      
+
       const action = sold ? "marcado como vendido" : "marcado como disponível"
       console.log(`Produto ${action}`)
     } catch (error) {
@@ -301,7 +396,7 @@ export default function AdminPage() {
     try {
       const bannerRef = doc(db, "banners", banner.id)
       await updateDoc(bannerRef, {
-        isActive: !banner.isActive
+        isActive: !banner.isActive,
       })
     } catch (error) {
       console.error("Erro ao alterar status do banner:", error)
@@ -328,7 +423,7 @@ export default function AdminPage() {
       if (!response.ok) throw new Error("Falha no upload da imagem")
 
       const data = await response.json()
-      
+
       const newImages = [...newProduct.images]
       newImages[index] = data.secure_url
       setNewProduct({ ...newProduct, images: newImages })
@@ -336,12 +431,12 @@ export default function AdminPage() {
       // Remove o estado de carregamento
       newUploadingImages[index] = false
       setUploadingImages(newUploadingImages)
-      
+
       return data.secure_url
     } catch (error) {
       console.error("Erro ao fazer upload da imagem:", error)
       alert("Erro ao fazer upload da imagem. Tente novamente.")
-      
+
       // Remove o estado de carregamento em caso de erro
       const newUploadingImages = [...uploadingImages]
       newUploadingImages[index] = false
@@ -365,7 +460,7 @@ export default function AdminPage() {
 
       const data = await response.json()
       setNewBanner({ ...newBanner, imageUrl: data.secure_url })
-      
+
       return data.secure_url
     } catch (error) {
       console.error("Erro ao fazer upload da imagem:", error)
@@ -394,6 +489,73 @@ export default function AdminPage() {
     }
   }
 
+  const updateOrderStatus = async (orderId: string, newStatus: string) => {
+    try {
+      const orderRef = doc(db, "orders", orderId)
+      await updateDoc(orderRef, {
+        status: newStatus,
+        updatedAt: new Date(),
+      })
+    } catch (error) {
+      console.error("Erro ao atualizar status do pedido:", error)
+      alert("Erro ao atualizar status do pedido.")
+    }
+  }
+
+  const getStatusInfo = (status: string) => {
+    switch (status) {
+      case "pending":
+        return { label: "Aguardando", color: "bg-yellow-100 text-yellow-800", icon: Clock }
+      case "confirmed":
+        return { label: "Confirmado", color: "bg-blue-100 text-blue-800", icon: CheckCircle }
+      case "shipped":
+        return { label: "Saiu para Entrega", color: "bg-purple-100 text-purple-800", icon: Truck }
+      case "delivered":
+        return { label: "Entregue", color: "bg-green-100 text-green-800", icon: CheckCircle }
+      case "cancelled":
+        return { label: "Cancelado", color: "bg-red-100 text-red-800", icon: X }
+      default:
+        return { label: "Desconhecido", color: "bg-gray-100 text-gray-800", icon: Package }
+    }
+  }
+
+  const formatDate = (date: Date) => {
+    return new Intl.DateTimeFormat("pt-BR", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    }).format(date)
+  }
+
+  const generateWhatsAppMessage = (order: Order) => {
+    const itemsList = order.items
+      .map(
+        (item) =>
+          `• ${item.productName} ${item.size ? `(${item.size})` : ""} - Qtd: ${item.quantity} - R$ ${(item.price * item.quantity).toFixed(2)}`,
+      )
+      .join("\n")
+
+    const message = `🛒 *PEDIDO #${order.id.slice(-6)}*
+
+*Cliente:* ${order.customerInfo.name}
+*Telefone:* ${order.customerInfo.phone}
+${order.customerInfo.email ? `*Email:* ${order.customerInfo.email}\n` : ""}
+*Itens do Pedido:*
+${itemsList}
+
+*Total: R$ ${order.total.toFixed(2)}*
+
+*Endereço de entrega:* ${order.customerInfo.address}
+${order.notes ? `\n*Observações:* ${order.notes}` : ""}
+
+📱 *Pedido realizado pelo site*
+Status atual: ${getStatusInfo(order.status).label}`
+
+    return `https://wa.me/${order.customerInfo.phone.replace(/\D/g, "")}?text=${encodeURIComponent(message)}`
+  }
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -416,9 +578,7 @@ export default function AdminPage() {
               </div>
             </div>
             <CardTitle className="text-2xl text-center">Acesso Administrativo</CardTitle>
-            <CardDescription className="text-center">
-              Entre com suas credenciais para acessar o painel
-            </CardDescription>
+            <CardDescription className="text-center">Entre com suas credenciais para acessar o painel</CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleLogin} className="space-y-4">
@@ -469,23 +629,35 @@ export default function AdminPage() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div>
             <h1 className="text-3xl font-bold">Painel Administrativo</h1>
-            <p className="text-muted-foreground">Gerencie seus produtos e banners promocionais</p>
+            <p className="text-muted-foreground">Gerencie produtos, banners, clientes e pedidos</p>
           </div>
-          <Button variant="outline" onClick={handleLogout} className="flex items-center gap-2 self-start sm:self-auto">
+          <Button
+            variant="outline"
+            onClick={handleLogout}
+            className="flex items-center gap-2 self-start sm:self-auto bg-transparent"
+          >
             <LogOut className="w-4 h-4" />
             Sair
           </Button>
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-2 mb-6">
+          <TabsList className="grid w-full grid-cols-4 mb-6">
             <TabsTrigger value="products" className="flex items-center gap-2">
               <ShoppingBag className="w-4 h-4" />
-              Produtos ({availableProducts.length} disponíveis, {soldProducts.length} vendidos)
+              Produtos ({availableProducts.length})
             </TabsTrigger>
             <TabsTrigger value="banners" className="flex items-center gap-2">
-              <Image className="w-4 h-4" />
-              Banners ({banners.filter(b => b.isActive).length} ativos)
+              <ImageIcon className="w-4 h-4" />
+              Banners ({banners.filter((b) => b.isActive).length})
+            </TabsTrigger>
+            <TabsTrigger value="customers" className="flex items-center gap-2">
+              <Users className="w-4 h-4" />
+              Clientes ({customers.length})
+            </TabsTrigger>
+            <TabsTrigger value="orders" className="flex items-center gap-2">
+              <ShoppingCart className="w-4 h-4" />
+              Pedidos ({orders.length})
             </TabsTrigger>
           </TabsList>
 
@@ -519,9 +691,13 @@ export default function AdminPage() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">Todas categorias</SelectItem>
-                        {categories.filter(cat => cat !== "all").map(category => (
-                          <SelectItem key={category} value={category}>{category}</SelectItem>
-                        ))}
+                        {categories
+                          .filter((cat) => cat !== "all")
+                          .map((category) => (
+                            <SelectItem key={category} value={category}>
+                              {category}
+                            </SelectItem>
+                          ))}
                       </SelectContent>
                     </Select>
                   </div>
@@ -549,17 +725,19 @@ export default function AdminPage() {
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="price">Preço (R$) *</Label>
-  <Input
-    id="price"
-    type="number"
-    step="0.01"
-    min="0"
-    value={newProduct.price === 0 ? "" : newProduct.price}
-    onChange={(e) => setNewProduct({ 
-      ...newProduct, 
-      price: e.target.value === "" ? 0 : Number.parseFloat(e.target.value) 
-    })}
-    placeholder="299.99"
+                      <Input
+                        id="price"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={newProduct.price === 0 ? "" : newProduct.price}
+                        onChange={(e) =>
+                          setNewProduct({
+                            ...newProduct,
+                            price: e.target.value === "" ? 0 : Number.parseFloat(e.target.value),
+                          })
+                        }
+                        placeholder="299.99"
                       />
                     </div>
                     <div className="space-y-2">
@@ -591,16 +769,18 @@ export default function AdminPage() {
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="stock">Estoque</Label>
-  <Input
-    id="stock"
-    type="number"
-    min="0"
-    value={newProduct.stock === 0 ? "" : newProduct.stock}
-    onChange={(e) => setNewProduct({ 
-      ...newProduct, 
-      stock: e.target.value === "" ? 0 : Number.parseInt(e.target.value) || 0 
-    })}
-    placeholder="Quantidade em estoque"
+                      <Input
+                        id="stock"
+                        type="number"
+                        min="0"
+                        value={newProduct.stock === 0 ? "" : newProduct.stock}
+                        onChange={(e) =>
+                          setNewProduct({
+                            ...newProduct,
+                            stock: e.target.value === "" ? 0 : Number.parseInt(e.target.value) || 0,
+                          })
+                        }
+                        placeholder="Quantidade em estoque"
                         placeholder="Quantidade em estoque"
                       />
                     </div>
@@ -635,14 +815,14 @@ export default function AdminPage() {
                             <input
                               type="file"
                               accept="image/*"
-                              ref={el => fileInputRefs.current[index] = el}
+                              ref={(el) => (fileInputRefs.current[index] = el)}
                               onChange={(e) => handleFileSelect(index, e.target.files)}
                               className="hidden"
                             />
-                            <Button 
-                              type="button" 
-                              variant="outline" 
-                              className="flex items-center gap-2"
+                            <Button
+                              type="button"
+                              variant="outline"
+                              className="flex items-center gap-2 bg-transparent"
                               onClick={() => fileInputRefs.current[index]?.click()}
                               disabled={uploadingImages[index]}
                             >
@@ -662,7 +842,7 @@ export default function AdminPage() {
                           {image && (
                             <div className="mt-2">
                               <img
-                                src={image}
+                                src={image || "/placeholder.svg"}
                                 alt={`Preview ${index + 1}`}
                                 className="w-32 h-32 object-contain border rounded-md"
                               />
@@ -670,19 +850,19 @@ export default function AdminPage() {
                           )}
                         </div>
                       ))}
-                      
+
                       {newProduct.images.length < 3 && (
                         <Button
                           type="button"
                           variant="outline"
                           onClick={addProductImage}
-                          className="w-full flex items-center gap-2"
+                          className="w-full flex items-center gap-2 bg-transparent"
                         >
                           <Plus className="w-4 h-4" />
                           Adicionar Imagem ({newProduct.images.length}/3)
                         </Button>
                       )}
-                      </div>
+                    </div>
                   </div>
                   <div className="flex items-center space-x-2">
                     <Switch
@@ -712,11 +892,13 @@ export default function AdminPage() {
                 <CardContent className="p-8 text-center">
                   <ShoppingBag className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
                   <h3 className="text-xl font-semibold mb-2">
-                    {searchTerm || selectedCategory !== "all" ? "Nenhum produto encontrado" : "Nenhum produto cadastrado"}
+                    {searchTerm || selectedCategory !== "all"
+                      ? "Nenhum produto encontrado"
+                      : "Nenhum produto cadastrado"}
                   </h3>
                   <p className="text-muted-foreground mb-4">
-                    {searchTerm || selectedCategory !== "all" 
-                      ? "Tente ajustar os filtros de busca ou categoria" 
+                    {searchTerm || selectedCategory !== "all"
+                      ? "Tente ajustar os filtros de busca ou categoria"
                       : "Adicione seu primeiro produto para começar!"}
                   </p>
                   <Button onClick={() => setIsAddingNew(true)} className="flex items-center gap-2 mx-auto">
@@ -728,11 +910,14 @@ export default function AdminPage() {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {filteredProducts.map((product) => (
-                  <Card key={product.id} className={`overflow-hidden ${product.featured ? 'border-primary border-2' : ''}`}>
+                  <Card
+                    key={product.id}
+                    className={`overflow-hidden ${product.featured ? "border-primary border-2" : ""}`}
+                  >
                     <div className="relative">
                       {product.images && product.images.length > 0 ? (
                         <img
-                          src={product.images[0]}
+                          src={product.images[0] || "/placeholder.svg"}
                           alt={product.name}
                           className="w-full h-48 object-cover"
                         />
@@ -741,11 +926,11 @@ export default function AdminPage() {
                           <ImageIcon className="w-12 h-12 text-gray-400" />
                         </div>
                       )}
-                      {product.featured && (
-                        <Badge className="absolute top-2 left-2 bg-primary">Destaque</Badge>
-                      )}
+                      {product.featured && <Badge className="absolute top-2 left-2 bg-primary">Destaque</Badge>}
                       {product.stock !== undefined && product.stock <= 0 && (
-                        <Badge variant="destructive" className="absolute top-2 right-2">Sem Estoque</Badge>
+                        <Badge variant="destructive" className="absolute top-2 right-2">
+                          Sem Estoque
+                        </Badge>
                       )}
                     </div>
                     <CardContent className="p-4">
@@ -756,25 +941,26 @@ export default function AdminPage() {
                             onChange={(e) => setEditingProduct({ ...editingProduct, name: e.target.value })}
                             placeholder="Nome do produto"
                           />
-<div className="grid grid-cols-2 gap-2">
-  <Input
-    type="number"
-    step="0.01"
-    value={editingProduct.price === 0 ? "" : editingProduct.price}
-    onChange={(e) =>
-      setEditingProduct({ 
-        ...editingProduct, 
-        price: e.target.value === "" ? 0 : Number.parseFloat(e.target.value) || 0 
-      })
-    }
-    placeholder="Preço"
-  />
-  <Input
-    value={editingProduct.category}
-    onChange={(e) => setEditingProduct({ ...editingProduct, category: e.target.value })}
-    placeholder="Categoria"
-  />
-</div>                          <div className="flex gap-2">
+                          <div className="grid grid-cols-2 gap-2">
+                            <Input
+                              type="number"
+                              step="0.01"
+                              value={editingProduct.price === 0 ? "" : editingProduct.price}
+                              onChange={(e) =>
+                                setEditingProduct({
+                                  ...editingProduct,
+                                  price: e.target.value === "" ? 0 : Number.parseFloat(e.target.value) || 0,
+                                })
+                              }
+                              placeholder="Preço"
+                            />
+                            <Input
+                              value={editingProduct.category}
+                              onChange={(e) => setEditingProduct({ ...editingProduct, category: e.target.value })}
+                              placeholder="Categoria"
+                            />
+                          </div>{" "}
+                          <div className="flex gap-2">
                             <Button
                               size="sm"
                               onClick={() => handleEditProduct(editingProduct)}
@@ -806,9 +992,19 @@ export default function AdminPage() {
                             )}
                           </div>
                           <div className="flex flex-wrap gap-1 mb-3">
-                            <Badge variant="secondary" className="text-xs">{product.category}</Badge>
-                            {product.brand && <Badge variant="outline" className="text-xs">{product.brand}</Badge>}
-                            {product.size && <Badge variant="outline" className="text-xs">{product.size}</Badge>}
+                            <Badge variant="secondary" className="text-xs">
+                              {product.category}
+                            </Badge>
+                            {product.brand && (
+                              <Badge variant="outline" className="text-xs">
+                                {product.brand}
+                              </Badge>
+                            )}
+                            {product.size && (
+                              <Badge variant="outline" className="text-xs">
+                                {product.size}
+                              </Badge>
+                            )}
                           </div>
                           <p className="text-sm text-muted-foreground mb-3 line-clamp-2">{product.description}</p>
                           <div className="flex gap-2 mb-3">
@@ -817,13 +1013,13 @@ export default function AdminPage() {
                               variant={product.sold ? "outline" : "default"}
                               onClick={() => markAsSold(product.id, !product.sold)}
                               className={`flex items-center gap-1 flex-1 ${
-                                product.sold 
-                                  ? 'bg-green-100 text-green-800 hover:bg-green-200' 
-                                  : 'bg-orange-100 text-orange-800 hover:bg-orange-200'
+                                product.sold
+                                  ? "bg-green-100 text-green-800 hover:bg-green-200"
+                                  : "bg-orange-100 text-orange-800 hover:bg-orange-200"
                               }`}
                             >
                               <CheckCircle className="w-3 h-3" />
-                              {product.sold ? 'Marcar Disponível' : 'Marcar como Vendido'}
+                              {product.sold ? "Marcar Disponível" : "Marcar como Vendido"}
                             </Button>
                           </div>
                           <div className="flex gap-2">
@@ -868,7 +1064,7 @@ export default function AdminPage() {
                       <div className="relative">
                         {product.images && product.images.length > 0 ? (
                           <img
-                            src={product.images[0]}
+                            src={product.images[0] || "/placeholder.svg"}
                             alt={product.name}
                             className="w-full h-48 object-cover grayscale"
                           />
@@ -912,7 +1108,10 @@ export default function AdminPage() {
           <TabsContent value="banners" className="space-y-6">
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
               <h2 className="text-2xl font-semibold">Gerenciar Banners Promocionais</h2>
-              <Button onClick={() => setIsAddingBanner(true)} className="flex items-center gap-2 self-start sm:self-auto">
+              <Button
+                onClick={() => setIsAddingBanner(true)}
+                className="flex items-center gap-2 self-start sm:self-auto"
+              >
                 <Plus className="w-4 h-4" />
                 Adicionar Banner
               </Button>
@@ -944,7 +1143,7 @@ export default function AdminPage() {
                         min="1"
                         max="10"
                         value={newBanner.priority}
-                        onChange={(e) => setNewBanner({ ...newBanner, priority: parseInt(e.target.value) || 1 })}
+                        onChange={(e) => setNewBanner({ ...newBanner, priority: Number.parseInt(e.target.value) || 1 })}
                         placeholder="1"
                       />
                     </div>
@@ -1026,12 +1225,12 @@ export default function AdminPage() {
                         }}
                         className="flex-1"
                       />
-                      <Button 
-                        type="button" 
-                        variant="outline" 
-                        className="flex items-center gap-2"
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="flex items-center gap-2 bg-transparent"
                         onClick={() => {
-                          const input = document.getElementById('banner-image') as HTMLInputElement
+                          const input = document.getElementById("banner-image") as HTMLInputElement
                           input?.click()
                         }}
                       >
@@ -1042,7 +1241,7 @@ export default function AdminPage() {
                     {newBanner.imageUrl && (
                       <div className="mt-2">
                         <img
-                          src={newBanner.imageUrl}
+                          src={newBanner.imageUrl || "/placeholder.svg"}
                           alt="Preview"
                           className="w-full h-40 object-contain border rounded-md"
                         />
@@ -1071,7 +1270,11 @@ export default function AdminPage() {
                       <Save className="w-4 h-4" />
                       Salvar Banner
                     </Button>
-                    <Button variant="outline" onClick={() => setIsAddingBanner(false)} className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => setIsAddingBanner(false)}
+                      className="flex items-center gap-2"
+                    >
                       <X className="w-4 h-4" />
                       Cancelar
                     </Button>
@@ -1098,7 +1301,7 @@ export default function AdminPage() {
             ) : (
               <div className="space-y-4">
                 {banners.map((banner) => (
-                  <Card key={banner.id} className={`${!banner.isActive ? 'opacity-70' : ''}`}>
+                  <Card key={banner.id} className={`${!banner.isActive ? "opacity-70" : ""}`}>
                     <CardContent className="p-4">
                       {editingBanner?.id === banner.id ? (
                         <div className="space-y-4">
@@ -1113,7 +1316,9 @@ export default function AdminPage() {
                               min="1"
                               max="10"
                               value={editingBanner.priority}
-                              onChange={(e) => setEditingBanner({ ...editingBanner, priority: parseInt(e.target.value) || 1 })}
+                              onChange={(e) =>
+                                setEditingBanner({ ...editingBanner, priority: Number.parseInt(e.target.value) || 1 })
+                              }
                               placeholder="Prioridade"
                             />
                           </div>
@@ -1141,7 +1346,7 @@ export default function AdminPage() {
                         <div className="flex flex-col md:flex-row items-start gap-4">
                           {banner.imageUrl ? (
                             <img
-                              src={banner.imageUrl}
+                              src={banner.imageUrl || "/placeholder.svg"}
                               alt={banner.title}
                               className="w-full md:w-48 h-32 object-cover rounded"
                             />
@@ -1153,10 +1358,12 @@ export default function AdminPage() {
                           <div className="flex-1">
                             <div className="flex flex-wrap items-center gap-2 mb-2">
                               <h3 className="font-semibold text-lg">{banner.title}</h3>
-                              <Badge className={
-                                banner.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-                              }>
-                                {banner.isActive ? 'Ativo' : 'Inativo'}
+                              <Badge
+                                className={
+                                  banner.isActive ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"
+                                }
+                              >
+                                {banner.isActive ? "Ativo" : "Inativo"}
                               </Badge>
                               <Badge variant="outline" className="bg-blue-100 text-blue-800">
                                 Prioridade: {banner.priority}
@@ -1172,7 +1379,15 @@ export default function AdminPage() {
                             )}
                             {banner.linkUrl && (
                               <p className="text-xs text-muted-foreground mt-1">
-                                Link: <a href={banner.linkUrl} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">{banner.linkUrl}</a>
+                                Link:{" "}
+                                <a
+                                  href={banner.linkUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-primary hover:underline"
+                                >
+                                  {banner.linkUrl}
+                                </a>
                               </p>
                             )}
                           </div>
@@ -1184,7 +1399,7 @@ export default function AdminPage() {
                               className="flex items-center gap-1"
                             >
                               {banner.isActive ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
-                              {banner.isActive ? 'Desativar' : 'Ativar'}
+                              {banner.isActive ? "Desativar" : "Ativar"}
                             </Button>
                             <Button
                               size="sm"
@@ -1210,6 +1425,193 @@ export default function AdminPage() {
                     </CardContent>
                   </Card>
                 ))}
+              </div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="customers" className="space-y-6">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+              <h2 className="text-2xl font-semibold">Gerenciar Clientes</h2>
+            </div>
+
+            {customers.length === 0 ? (
+              <Card>
+                <CardContent className="p-8 text-center">
+                  <Users className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
+                  <h3 className="text-xl font-semibold mb-2">Nenhum cliente cadastrado</h3>
+                  <p className="text-muted-foreground">Os clientes aparecerão aqui quando fizerem pedidos pelo site.</p>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {customers.map((customer) => (
+                  <Card key={customer.id}>
+                    <CardHeader>
+                      <CardTitle className="text-lg">{customer.name}</CardTitle>
+                      <CardDescription>Cliente desde {formatDate(customer.createdAt)}</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <div className="space-y-2 text-sm">
+                        <p>
+                          <strong>Telefone:</strong> {customer.phone}
+                        </p>
+                        {customer.email && (
+                          <p>
+                            <strong>Email:</strong> {customer.email}
+                          </p>
+                        )}
+                        <p>
+                          <strong>Endereço:</strong> {customer.address}
+                        </p>
+                      </div>
+
+                      <div className="flex gap-2">
+                        <Badge variant="outline">
+                          {customer.totalOrders} pedido{customer.totalOrders !== 1 ? "s" : ""}
+                        </Badge>
+                        <Badge variant="secondary">R$ {customer.totalSpent.toFixed(2)} gasto</Badge>
+                      </div>
+
+                      <Button
+                        size="sm"
+                        className="w-full"
+                        onClick={() => window.open(`https://wa.me/${customer.phone.replace(/\D/g, "")}`, "_blank")}
+                      >
+                        <MessageSquare className="w-4 h-4 mr-2" />
+                        Contatar no WhatsApp
+                      </Button>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="orders" className="space-y-6">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+              <h2 className="text-2xl font-semibold">Gerenciar Pedidos</h2>
+            </div>
+
+            {orders.length === 0 ? (
+              <Card>
+                <CardContent className="p-8 text-center">
+                  <ShoppingCart className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
+                  <h3 className="text-xl font-semibold mb-2">Nenhum pedido realizado</h3>
+                  <p className="text-muted-foreground">
+                    Os pedidos aparecerão aqui quando os clientes finalizarem compras pelo site.
+                  </p>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="space-y-4">
+                {orders.map((order) => {
+                  const statusInfo = getStatusInfo(order.status)
+                  const StatusIcon = statusInfo.icon
+
+                  return (
+                    <Card key={order.id}>
+                      <CardHeader>
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <CardTitle className="text-lg">Pedido #{order.id.slice(-6)}</CardTitle>
+                            <CardDescription>
+                              {formatDate(order.createdAt)} • {order.customerInfo.name}
+                            </CardDescription>
+                          </div>
+                          <Badge className={statusInfo.color}>
+                            <StatusIcon className="h-4 w-4 mr-1" />
+                            {statusInfo.label}
+                          </Badge>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        {/* Informações do cliente */}
+                        <div className="bg-gray-50 p-4 rounded-lg">
+                          <h4 className="font-medium mb-2">Dados do Cliente</h4>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+                            <p>
+                              <strong>Nome:</strong> {order.customerInfo.name}
+                            </p>
+                            <p>
+                              <strong>Telefone:</strong> {order.customerInfo.phone}
+                            </p>
+                            {order.customerInfo.email && (
+                              <p>
+                                <strong>Email:</strong> {order.customerInfo.email}
+                              </p>
+                            )}
+                            <p className="md:col-span-2">
+                              <strong>Endereço:</strong> {order.customerInfo.address}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Itens do pedido */}
+                        <div>
+                          <h4 className="font-medium mb-3">Itens do Pedido</h4>
+                          <div className="space-y-2">
+                            {order.items.map((item, index) => (
+                              <div key={index} className="flex items-center gap-3 p-2 border rounded">
+                                <img
+                                  src={item.imageUrl || "/placeholder.svg"}
+                                  alt={item.productName}
+                                  className="w-10 h-10 object-cover rounded"
+                                />
+                                <div className="flex-1">
+                                  <p className="font-medium text-sm">{item.productName}</p>
+                                  <p className="text-xs text-gray-600">
+                                    {item.category} {item.size && `• ${item.size}`} {item.brand && `• ${item.brand}`}
+                                  </p>
+                                </div>
+                                <div className="text-right text-sm">
+                                  <p>Qtd: {item.quantity}</p>
+                                  <p className="font-bold">R$ {(item.price * item.quantity).toFixed(2)}</p>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Total e observações */}
+                        <div className="flex justify-between items-center pt-2 border-t">
+                          <div>
+                            {order.notes && (
+                              <p className="text-sm text-gray-600">
+                                <strong>Obs:</strong> {order.notes}
+                              </p>
+                            )}
+                          </div>
+                          <p className="text-lg font-bold text-primary">Total: R$ {order.total.toFixed(2)}</p>
+                        </div>
+
+                        {/* Ações */}
+                        <div className="flex flex-wrap gap-2 pt-2">
+                          <Select value={order.status} onValueChange={(value) => updateOrderStatus(order.id, value)}>
+                            <SelectTrigger className="w-[200px]">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="pending">Aguardando Confirmação</SelectItem>
+                              <SelectItem value="confirmed">Pedido Confirmado</SelectItem>
+                              <SelectItem value="shipped">Saiu para Entrega</SelectItem>
+                              <SelectItem value="delivered">Entregue</SelectItem>
+                              <SelectItem value="cancelled">Cancelado</SelectItem>
+                            </SelectContent>
+                          </Select>
+
+                          <Button
+                            size="sm"
+                            onClick={() => window.open(generateWhatsAppMessage(order), "_blank")}
+                            className="flex items-center gap-2"
+                          >
+                            <MessageSquare className="w-4 h-4" />
+                            WhatsApp
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )
+                })}
               </div>
             )}
           </TabsContent>
