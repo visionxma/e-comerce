@@ -1,6 +1,7 @@
 "use client"
 
 import type React from "react"
+import type { Product } from "@/app/page"
 
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
@@ -19,6 +20,7 @@ import { toast } from "@/hooks/use-toast"
 interface CheckoutModalProps {
   isOpen: boolean
   onClose: () => void
+  directProduct?: Product | null
 }
 
 interface CustomerData {
@@ -29,7 +31,7 @@ interface CustomerData {
   notes: string
 }
 
-export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
+export function CheckoutModal({ isOpen, onClose, directProduct }: CheckoutModalProps) {
   const { items, getTotalPrice, clearCart } = useCart()
   const [isProcessing, setIsProcessing] = useState(false)
   const [customerData, setCustomerData] = useState<CustomerData>({
@@ -39,6 +41,23 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
     address: "",
     notes: "",
   })
+
+  const checkoutItems = directProduct
+    ? [
+        {
+          id: directProduct.id,
+          name: directProduct.name,
+          price: directProduct.price,
+          quantity: 1,
+          image: directProduct.images?.[0] || "/placeholder.svg",
+          category: directProduct.category,
+          size: directProduct.size,
+          brand: directProduct.brand,
+        },
+      ]
+    : items
+
+  const checkoutTotal = directProduct ? directProduct.price : getTotalPrice()
 
   useEffect(() => {
     if (isOpen) {
@@ -70,10 +89,10 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
       return
     }
 
-    if (items.length === 0) {
+    if (checkoutItems.length === 0) {
       toast({
-        title: "Carrinho vazio",
-        description: "Adicione produtos ao carrinho antes de finalizar.",
+        title: "Nenhum produto selecionado",
+        description: "Selecione um produto antes de finalizar.",
         variant: "destructive",
       })
       return
@@ -82,7 +101,6 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
     setIsProcessing(true)
 
     try {
-      // Criar pedido no Firestore
       const orderData = {
         customerInfo: {
           name: customerData.name,
@@ -90,7 +108,7 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
           email: customerData.email,
           address: customerData.address,
         },
-        items: items.map((item) => ({
+        items: checkoutItems.map((item) => ({
           productId: item.id,
           productName: item.name,
           price: item.price,
@@ -100,7 +118,7 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
           size: item.size,
           brand: item.brand,
         })),
-        total: getTotalPrice(),
+        total: checkoutTotal,
         status: "pending",
         notes: customerData.notes,
         createdAt: new Date(),
@@ -111,7 +129,6 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
 
       let customerDocId = null
 
-      // Buscar cliente existente por email ou telefone
       const customerQuery = query(
         collection(db, "customers"),
         where("email", "==", customerData.email || ""),
@@ -121,7 +138,6 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
       const existingCustomers = await getDocs(customerQuery)
 
       if (!existingCustomers.empty) {
-        // Cliente existe - atualizar dados
         const existingCustomer = existingCustomers.docs[0]
         customerDocId = existingCustomer.id
         const currentData = existingCustomer.data()
@@ -133,11 +149,10 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
           lastOrderId: docRef.id,
           lastOrderDate: new Date(),
           totalOrders: (currentData.totalOrders || 0) + 1,
-          totalSpent: (currentData.totalSpent || 0) + getTotalPrice(),
+          totalSpent: (currentData.totalSpent || 0) + checkoutTotal,
           updatedAt: new Date(),
         })
       } else {
-        // Cliente novo - criar
         const customerDoc = {
           name: customerData.name,
           phone: customerData.phone,
@@ -146,7 +161,7 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
           lastOrderId: docRef.id,
           lastOrderDate: new Date(),
           totalOrders: 1,
-          totalSpent: getTotalPrice(),
+          totalSpent: checkoutTotal,
           createdAt: new Date(),
           updatedAt: new Date(),
         }
@@ -155,8 +170,9 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
         customerDocId = newCustomerRef.id
       }
 
-      // Limpar carrinho e fechar modal
-      clearCart()
+      if (!directProduct) {
+        clearCart()
+      }
       onClose()
 
       toast({
@@ -186,14 +202,16 @@ export function CheckoutModal({ isOpen, onClose }: CheckoutModalProps) {
   }
 
   const handleWhatsAppCheckout = () => {
-    const itemsList = items
+    const itemsList = checkoutItems
       .map(
         (item) =>
           `• ${item.name} ${item.size ? `(${item.size})` : ""} - Qtd: ${item.quantity} - R$ ${(item.price * item.quantity).toFixed(2)}`,
       )
       .join("\n")
 
-    const message = `🛒 *PEDIDO DO CARRINHO*
+    const messageType = directProduct ? "COMPRA DIRETA" : "PEDIDO DO CARRINHO"
+
+    const message = `🛒 *${messageType}*
 
 *Cliente:* ${customerData.name}
 *Telefone:* ${customerData.phone}
@@ -201,7 +219,7 @@ ${customerData.email ? `*Email:* ${customerData.email}\n` : ""}
 *Itens do Pedido:*
 ${itemsList}
 
-*Total: R$ ${getTotalPrice().toFixed(2)}*
+*Total: R$ ${checkoutTotal.toFixed(2)}*
 
 *Endereço de entrega:* ${customerData.address}
 ${customerData.notes ? `\n*Observações:* ${customerData.notes}` : ""}
@@ -212,18 +230,19 @@ Gostaria de confirmar este pedido! 🙏`
     const whatsappUrl = `https://wa.me/5599984680391?text=${encodeURIComponent(message)}`
     window.open(whatsappUrl, "_blank")
 
-    clearCart()
+    if (!directProduct) {
+      clearCart()
+    }
     onClose()
   }
 
   return (
     <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl">
-        {/* Header */}
         <div className="flex items-center justify-between p-6 border-b">
           <div className="flex items-center gap-3">
             <ShoppingCart className="h-6 w-6 text-primary" />
-            <h2 className="text-2xl font-bold">Finalizar Pedido</h2>
+            <h2 className="text-2xl font-bold">{directProduct ? "Comprar Agora" : "Finalizar Pedido"}</h2>
           </div>
           <Button variant="ghost" size="icon" onClick={onClose}>
             <X className="h-5 w-5" />
@@ -231,7 +250,6 @@ Gostaria de confirmar este pedido! 🙏`
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
-          {/* Dados do Cliente */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -298,13 +316,12 @@ Gostaria de confirmar este pedido! 🙏`
             </CardContent>
           </Card>
 
-          {/* Resumo do Pedido */}
           <Card>
             <CardHeader>
               <CardTitle>Resumo do Pedido</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {items.map((item) => (
+              {checkoutItems.map((item) => (
                 <div key={item.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
                   <img
                     src={item.image || "/placeholder.svg"}
@@ -329,12 +346,11 @@ Gostaria de confirmar este pedido! 🙏`
 
               <div className="flex justify-between items-center text-lg font-bold">
                 <span>Total:</span>
-                <span className="text-primary">R$ {getTotalPrice().toFixed(2)}</span>
+                <span className="text-primary">R$ {checkoutTotal.toFixed(2)}</span>
               </div>
             </CardContent>
           </Card>
 
-          {/* Botões de Finalização */}
           <div className="space-y-3">
             <Button
               type="submit"
